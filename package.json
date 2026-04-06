@@ -1,0 +1,12 @@
+{
+  "name": "service-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}
