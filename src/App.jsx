@@ -22,9 +22,10 @@ const style = `
     --sidebar-w: 240px;
   }
 
-  body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100%; }
 
-  .shell { display: flex; flex-direction: column; height: 100vh; max-width: 1200px; margin: 0 auto; }
+  .shell { display: flex; flex-direction: column; min-height: 100vh; max-width: 1200px; margin: 0 auto; }
 
   .topbar {
     display: flex; align-items: center; justify-content: space-between;
@@ -39,12 +40,12 @@ const style = `
   .ts-val { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; color: var(--amber); line-height: 1; }
   .ts-lbl { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; }
 
-  .body { display: flex; flex: 1; overflow: hidden; }
+  .body { display: flex; flex: 1; min-height: 0; }
 
   /* SIDEBAR */
   .sidebar {
     width: var(--sidebar-w); flex-shrink: 0; border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; overflow: hidden; background: var(--bg2);
+    display: flex; flex-direction: column; background: var(--bg2); position: sticky; top: 53px; max-height: calc(100vh - 53px); overflow-y: auto; align-self: flex-start;
   }
   .sidebar-header {
     padding: 12px 14px 10px; border-bottom: 1px solid var(--border);
@@ -79,8 +80,8 @@ const style = `
   .sidebar-add:hover { border-color: var(--amber); color: var(--amber); }
 
   /* MAIN */
-  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .main-content { flex: 1; overflow-y: auto; padding: 24px; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .main-content { padding: 24px; }
 
   .main-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
   .vehicle-title { font-family: 'Rajdhani', sans-serif; font-size: 24px; font-weight: 700; color: var(--text-bright); line-height: 1; margin-bottom: 4px; }
