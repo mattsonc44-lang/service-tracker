@@ -4,19 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ServiceLog — Fleet Maintenance Tracker</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x2699;</text></svg>" />
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</head>
-<body style="margin:0;padding:0;background:#0d0f12;">
-  <div id="root"></div>
-  <script type="text/babel">
-    const { useState } = React;
-
-
-const style = `
-  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap');
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -250,7 +239,17 @@ const style = `
     .sidebar { display:none; }
     .main-content { padding:16px; }
   }
-`;
+  </style>
+</head>
+<body style="margin:0;padding:0;background:#0d0f12;">
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const { useState } = React;
+
+
 
 const ICONS = { Truck:"🚛",Tractor:"🚜",Combine:"🌾","Grain Cart":"⚙",Semi:"🚛",Trailer:"📦",Sprayer:"💧",Pickup:"🛻","ATV/UTV":"🏎",Generator:"⚡",Other:"🔧" };
 const SERVICE_TYPES = ["Oil Change","Filter Replacement","Tire Service","Brake Service","Hydraulic Service","Belt/Chain Replacement","Coolant Service","Fuel System","Battery/Electrical","Inspection","Repair","Other"];
@@ -339,7 +338,6 @@ function App() {
 
   return (
     <>
-      <style>{style}</style>
       <div className="shell">
 
         {/* TOPBAR */}
@@ -582,8 +580,7 @@ function RecordModal({initial,onSave,onClose}){
 }
 
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(React.createElement(App));
+    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
   </script>
 </body>
 </html>
