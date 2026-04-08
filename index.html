@@ -122,6 +122,36 @@
     .form-input:focus, .form-select:focus, .form-textarea:focus { border-color:var(--amber); }
     .form-select { appearance:none; cursor:pointer; }
     .form-textarea { resize:vertical; min-height:76px; }
+
+    /* REPORT */
+    .report-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
+    .report-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:140px; }
+    .report-field label { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
+    .report-field input, .report-field select { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:8px 11px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; transition:border-color .15s; width:100%; }
+    .report-field input:focus, .report-field select:focus { border-color:var(--amber); }
+    .report-field select { appearance:none; cursor:pointer; }
+    .report-clear { background:var(--bg3); color:var(--text-dim); border:1px solid var(--border2); border-radius:4px; padding:8px 14px; font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:700; cursor:pointer; align-self:flex-end; white-space:nowrap; }
+    .report-clear:hover { border-color:var(--amber); color:var(--amber); }
+    .report-summary { display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+    .report-stat { background:var(--panel); border:1px solid var(--border); border-radius:4px; padding:8px 14px; }
+    .report-stat-val { font-family:'Rajdhani',sans-serif; font-size:20px; font-weight:700; color:var(--amber); line-height:1; }
+    .report-stat-lbl { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; color:var(--text-dim); text-transform:uppercase; margin-top:3px; }
+    .report-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .report-table th { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); padding:8px 12px; text-align:left; border-bottom:1px solid var(--border2); background:var(--bg2); position:sticky; top:0; }
+    .report-table td { padding:10px 12px; border-bottom:1px solid var(--border); color:var(--text); vertical-align:top; }
+    .report-table tr:hover td { background:rgba(255,255,255,.02); }
+    .report-table .td-vehicle { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; color:var(--text-bright); cursor:pointer; }
+    .report-table .td-vehicle:hover { color:var(--amber); }
+    .report-table .td-date { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--text-dim); white-space:nowrap; }
+    .report-table .td-type { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--amber); }
+    .report-table .td-part { font-family:'Share Tech Mono',monospace; font-size:11px; color:var(--amber); }
+    .report-table .td-cost { font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--green); text-align:right; }
+    .report-table .td-notes { font-size:12px; color:var(--text-dim); max-width:320px; }
+    .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:0; flex-shrink:0; }
+    .tab-btn { padding:10px 20px; font-family:'Rajdhani',sans-serif; font-size:15px; font-weight:600; color:var(--text-dim); cursor:pointer; border:none; background:none; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s, border-color .15s; }
+    .tab-btn:hover { color:var(--text); }
+    .tab-btn.active { color:var(--amber); border-bottom-color:var(--amber); }
+    .report-empty { text-align:center; padding:60px 20px; color:var(--text-dim); }
     ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background:var(--bg); } ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
     /* PHOTO */
     .si-thumb { width:32px; height:32px; border-radius:4px; object-fit:cover; flex-shrink:0; border:1px solid var(--border2); }
@@ -189,6 +219,8 @@
     let modalState = null;
     let pendingPhoto = undefined;
     let sidebarSearch = '';
+    let appView = 'fleet'; // fleet | report
+    let reportFilters = {year:'', equipment:'', partnum:'', make:'', keyword:''};
 
     function update(next) { data=next; saveData(next); render(); }
 
@@ -386,6 +418,94 @@
       </div>`;
     }
 
+
+    function renderReport() {
+      const {year, equipment, partnum, make, keyword} = reportFilters;
+      let results = data.records.map(r => {
+        const v = data.vehicles.find(v=>v.id===r.vehicleId)||{name:'Unknown',make:'',year:'',type:''};
+        return {...r, _v: v};
+      });
+      if (year)      results = results.filter(r => r.date && r.date.startsWith(year));
+      if (equipment) results = results.filter(r => r._v.name.toLowerCase().includes(equipment.toLowerCase()));
+      if (partnum)   results = results.filter(r => (r.partnum||'').toLowerCase().includes(partnum.toLowerCase()) || (r.notes||'').toLowerCase().includes(partnum.toLowerCase()));
+      if (make)      results = results.filter(r => r._v.make.toLowerCase().includes(make.toLowerCase()));
+      if (keyword)   results = results.filter(r => [r.notes||'', r.type||'', r.tech||'', r.partnum||'', r._v.name||''].join(' ').toLowerCase().includes(keyword.toLowerCase()));
+      results.sort((a,b) => b.date.localeCompare(a.date));
+
+      const totalCostR = results.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
+      const uniqueVehicles = new Set(results.map(r=>r.vehicleId)).size;
+
+      // Get unique years for dropdown
+      const years = [...new Set(data.records.map(r=>r.date?r.date.slice(0,4):null).filter(Boolean))].sort((a,b)=>b-a);
+      const makes = [...new Set(data.vehicles.map(v=>v.make).filter(Boolean))].sort();
+
+      return `
+        <div class="overview-title">Service Report</div>
+        <div class="report-bar">
+          <div class="report-field">
+            <label>Year</label>
+            <select id="rf-year" data-action="report-filter" data-field="year">
+              <option value="">All Years</option>
+              ${years.map(y=>`<option value="${y}"${reportFilters.year===y?' selected':''}>${y}</option>`).join('')}
+            </select>
+          </div>
+          <div class="report-field">
+            <label>Equipment</label>
+            <input id="rf-equipment" type="text" placeholder="Search equipment..." value="${esc(equipment)}" data-action="report-input" data-field="equipment" />
+          </div>
+          <div class="report-field">
+            <label>Part #</label>
+            <input id="rf-partnum" type="text" placeholder="Part number..." value="${esc(partnum)}" data-action="report-input" data-field="partnum" />
+          </div>
+          <div class="report-field">
+            <label>Make</label>
+            <select id="rf-make" data-action="report-filter" data-field="make">
+              <option value="">All Makes</option>
+              ${makes.map(m=>`<option value="${m}"${reportFilters.make===m?' selected':''}>${esc(m)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="report-field">
+            <label>Keyword</label>
+            <input id="rf-keyword" type="text" placeholder="Search all fields..." value="${esc(keyword)}" data-action="report-input" data-field="keyword" />
+          </div>
+          <button class="report-clear" data-action="report-clear">Clear</button>
+        </div>
+        <div class="report-summary">
+          <div class="report-stat"><div class="report-stat-val">${results.length}</div><div class="report-stat-lbl">Records</div></div>
+          <div class="report-stat"><div class="report-stat-val">${uniqueVehicles}</div><div class="report-stat-lbl">Equipment</div></div>
+          <div class="report-stat"><div class="report-stat-val">$${totalCostR.toLocaleString()}</div><div class="report-stat-lbl">Total Cost</div></div>
+        </div>
+        ${results.length === 0 ? `<div class="report-empty">
+          <div style="font-size:40px;margin-bottom:12px">🔍</div>
+          <div style="font-family:'Rajdhani',sans-serif;font-size:20px;font-weight:600;color:var(--text);margin-bottom:6px">No records found</div>
+          <div style="font-size:14px">Try adjusting your search filters.</div>
+        </div>` : `
+        <div style="overflow-x:auto">
+        <table class="report-table">
+          <thead><tr>
+            <th>Date</th>
+            <th>Equipment</th>
+            <th>Type</th>
+            <th>Notes</th>
+            <th>Part #</th>
+            <th>Tech</th>
+            <th style="text-align:right">Cost</th>
+          </tr></thead>
+          <tbody>
+            ${results.map(r=>`<tr>
+              <td class="td-date">${r.date||''}</td>
+              <td class="td-vehicle" data-action="select-from-report" data-id="${esc(r.vehicleId)}">${esc(r._v.name)}</td>
+              <td class="td-type">${esc(r.type)}</td>
+              <td class="td-notes">${esc((r.notes||'').slice(0,120))}</td>
+              <td class="td-part">${r.partnum?esc(r.partnum):''}</td>
+              <td style="font-size:12px;color:var(--text-dim)">${esc(r.tech||'')}</td>
+              <td class="td-cost">${r.cost?'$'+Number(r.cost).toLocaleString():''}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        </div>`}`;
+    }
+
     function render() {
       const selected = data.vehicles.find(v=>v.id===selectedId)||null;
       const topBtn = selected
@@ -410,10 +530,16 @@
           </div>
           ${topBtn}
         </div>
-        <div class="layout">
-          ${renderSidebar()}
-          <div class="main"><div class="main-content">${selected?renderDetail(selected):renderOverview()}</div></div>
+        <div class="tab-bar">
+          <button class="tab-btn${appView==='fleet'?' active':''}" data-action="tab-fleet">Fleet</button>
+          <button class="tab-btn${appView==='report'?' active':''}" data-action="tab-report">Report</button>
         </div>
+        ${appView==='report'
+          ? `<div class="main"><div class="main-content">${renderReport()}</div></div>`
+          : `<div class="layout">
+              ${renderSidebar()}
+              <div class="main"><div class="main-content">${selected?renderDetail(selected):renderOverview()}</div></div>
+             </div>`}
         ${modal}`;
     }
 
@@ -428,7 +554,17 @@
       const action = el.dataset.action;
       const id = el.dataset.id;
 
-      if (action==='sidebar-search') {
+      if (action==='tab-fleet') {
+        appView='fleet'; render();
+      } else if (action==='tab-report') {
+        appView='report'; render();
+      } else if (action==='report-clear') {
+        reportFilters={year:'',equipment:'',partnum:'',make:'',keyword:''}; render();
+      } else if (action==='report-filter') {
+        reportFilters[el.dataset.field] = el.value; render();
+      } else if (action==='select-from-report') {
+        appView='fleet'; selectedId=id; render();
+      } else if (action==='sidebar-search') {
         // handled by input event
       } else if (action==='select') {
         selectedId = id||null; render();
@@ -514,6 +650,14 @@
 
     // Sidebar search - use delegated input event on app
     document.getElementById('app').addEventListener('input', function(e) {
+      if (e.target.dataset.action === 'report-input') {
+        reportFilters[e.target.dataset.field] = e.target.value;
+        render();
+        // restore focus
+        const el = document.querySelector('[data-field="'+e.target.dataset.field+'"]');
+        if (el) { el.focus(); el.setSelectionRange && el.setSelectionRange(el.value.length, el.value.length); }
+        return;
+      }
       if (e.target.id === 'sidebar-search-input') {
         sidebarSearch = e.target.value;
         render();
