@@ -4,583 +4,446 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ServiceLog — Fleet Maintenance Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/htm@3/dist/htm.js"></script>
   <style>
-@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg: #0d0f12;
-    --bg2: #141619;
-    --bg3: #1a1d22;
-    --panel: #1e2128;
-    --border: #2a2e38;
-    --border2: #353a47;
-    --amber: #f5a623;
-    --amber-dim: #c47e0e;
-    --red: #e8402a;
-    --green: #3dba6f;
-    --text: #d4d8e2;
-    --text-dim: #7a8099;
-    --text-bright: #eef0f5;
-    --sidebar-w: 240px;
-  }
-
-  body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
-
-  .shell { display: flex; flex-direction: column; height: 100vh; max-width: 1200px; margin: 0 auto; }
-
-  .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 12px;
-  }
-  .topbar-brand { display: flex; align-items: baseline; gap: 10px; }
-  .topbar-eyebrow { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; }
-  .topbar-title { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700; color: var(--text-bright); letter-spacing: 1px; line-height: 1; }
-  .topbar-title span { color: var(--amber); }
-  .topbar-stats { display: flex; gap: 20px; }
-  .ts-item { text-align: center; }
-  .ts-val { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; color: var(--amber); line-height: 1; }
-  .ts-lbl { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; }
-
-  .body { display: flex; flex: 1; overflow: hidden; }
-
-  /* SIDEBAR */
-  .sidebar {
-    width: var(--sidebar-w); flex-shrink: 0; border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; overflow: hidden; background: var(--bg2);
-  }
-  .sidebar-header {
-    padding: 12px 14px 10px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-  }
-  .sidebar-label { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
-  .sidebar-list { overflow-y: auto; flex: 1; padding: 6px 0; }
-
-  .sidebar-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 14px; cursor: pointer; transition: background .12s;
-    border-left: 3px solid transparent;
-  }
-  .sidebar-item:hover { background: var(--bg3); }
-  .sidebar-item.active { background: rgba(245,166,35,.08); border-left-color: var(--amber); }
-  .si-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
-  .si-info { flex: 1; min-width: 0; }
-  .si-name { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-  .sidebar-item.active .si-name { color: var(--amber); }
-  .si-sub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .si-count { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-dim); background: var(--bg3); padding: 1px 6px; border-radius: 10px; flex-shrink: 0; }
-  .sidebar-item.active .si-count { background: rgba(245,166,35,.15); color: var(--amber); }
-  .sidebar-divider { height: 1px; background: var(--border); margin: 6px 0; }
-
-  .sidebar-add {
-    margin: 8px 10px 10px; padding: 8px; border: 1px dashed var(--border2); border-radius: 4px;
-    background: none; color: var(--text-dim); font-family: 'Rajdhani', sans-serif; font-size: 13px;
-    font-weight: 600; letter-spacing: 0.5px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    transition: border-color .15s, color .15s; flex-shrink: 0;
-  }
-  .sidebar-add:hover { border-color: var(--amber); color: var(--amber); }
-
-  /* MAIN */
-  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .main-content { flex: 1; overflow-y: auto; padding: 24px; }
-
-  .main-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-  .vehicle-title { font-family: 'Rajdhani', sans-serif; font-size: 24px; font-weight: 700; color: var(--text-bright); line-height: 1; margin-bottom: 4px; }
-  .vehicle-subtitle { font-size: 13px; color: var(--text-dim); }
-  .vehicle-notes { font-size: 13px; color: var(--text-dim); margin-top: 3px; font-style: italic; }
-
-  .overview-title { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px; }
-  .overview-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
-
-  .fleet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-  .vehicle-card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
-    padding: 18px; cursor: pointer; transition: border-color .15s, transform .1s; position: relative; overflow: hidden;
-  }
-  .vehicle-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--amber); opacity:0; transition:opacity .15s; }
-  .vehicle-card:hover { border-color: var(--border2); transform: translateY(-2px); }
-  .vehicle-card:hover::before { opacity: 1; }
-  .vc-type { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--amber); text-transform:uppercase; margin-bottom:5px; }
-  .vc-name { font-family:'Rajdhani',sans-serif; font-size:18px; font-weight:700; color:var(--text-bright); margin-bottom:3px; }
-  .vc-sub { font-size:12px; color:var(--text-dim); margin-bottom:12px; }
-  .vc-meta { display:flex; gap:14px; flex-wrap:wrap; }
-  .vc-stat { display:flex; flex-direction:column; gap:1px; }
-  .vc-stat-label { font-size:9px; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim); font-family:'Share Tech Mono',monospace; }
-  .vc-stat-val { font-size:14px; font-weight:600; color:var(--text); }
-  .vc-last { margin-top:10px; font-size:11px; color:var(--text-dim); }
-
-  .summary-bar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
-  .summary-stat { background:var(--panel); border:1px solid var(--border); border-radius:4px; padding:10px 16px; flex:1; min-width:90px; }
-  .summary-stat-val { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:var(--amber); line-height:1; }
-  .summary-stat-lbl { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; color:var(--text-dim); text-transform:uppercase; margin-top:3px; }
-
-  .service-list { display:flex; flex-direction:column; gap:10px; }
-  .service-record {
-    background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--amber-dim);
-    border-radius:4px; padding:14px 18px;
-    display:grid; grid-template-columns:56px 1fr auto; gap:14px; align-items:start;
-    transition:border-color .15s;
-  }
-  .service-record:hover { border-left-color:var(--amber); }
-  .sr-date-col { text-align:center; }
-  .sr-date-day { font-family:'Rajdhani',sans-serif; font-size:24px; font-weight:700; color:var(--amber); line-height:1; }
-  .sr-date-mon { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--text-dim); text-transform:uppercase; }
-  .sr-date-yr { font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--text-dim); }
-  .sr-type { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--text-bright); margin-bottom:3px; }
-  .sr-notes { font-size:13px; color:var(--text-dim); line-height:1.4; margin-bottom:6px; }
-  .sr-tags { display:flex; gap:6px; flex-wrap:wrap; }
-  .sr-tag { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--text-dim); background:var(--bg3); padding:2px 7px; border-radius:3px; }
-  .sr-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
-  .sr-cost { font-family:'Share Tech Mono',monospace; font-size:14px; color:var(--green); }
-
-  /* VEHICLE INFO CARD */
-  .vehicle-info-card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    margin-bottom: 20px;
-    overflow: hidden;
-  }
-  .vic-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 16px 20px 14px;
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-  }
-  .vic-identity { display: flex; align-items: center; gap: 14px; }
-  .vic-icon-wrap {
-    width: 48px; height: 48px; border-radius: 6px;
-    background: rgba(245,166,35,.1); border: 1px solid rgba(245,166,35,.25);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; flex-shrink: 0;
-  }
-  .vic-name { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:var(--text-bright); line-height:1; margin-bottom:3px; }
-  .vic-type-badge {
-    display: inline-block;
-    font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px;
-    text-transform:uppercase; color:var(--amber);
-    background: rgba(245,166,35,.1); padding:2px 8px; border-radius:3px;
-  }
-  .vic-actions { display:flex; gap:8px; flex-shrink:0; }
-
-  .vic-specs {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 0;
-  }
-  .vic-spec {
-    padding: 12px 18px;
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-  }
-  .vic-spec:last-child { border-right: none; }
-  .vic-spec-label { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
-  .vic-spec-val { font-size:14px; font-weight:600; color:var(--text-bright); font-family:'Rajdhani',sans-serif; }
-  .vic-notes-row {
-    padding: 10px 18px;
-    font-size: 13px;
-    color: var(--text-dim);
-    font-style: italic;
-    border-top: 1px solid var(--border);
-  }
-
-  .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
-  .empty-icon { font-size:44px; margin-bottom:12px; }
-  .empty-title { font-family:'Rajdhani',sans-serif; font-size:20px; font-weight:600; margin-bottom:6px; color:var(--text); }
-  .empty-sub { font-size:14px; }
-
-  .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:4px; font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; letter-spacing:0.5px; cursor:pointer; border:none; transition:background .15s, transform .1s; }
-  .btn:active { transform:scale(.98); }
-  .btn-primary { background:var(--amber); color:#0d0f12; }
-  .btn-primary:hover { background:#f0b84e; }
-  .btn-ghost { background:var(--bg3); color:var(--text); border:1px solid var(--border2); }
-  .btn-ghost:hover { border-color:var(--amber); color:var(--amber); }
-  .btn-danger { background:rgba(232,64,42,.15); color:var(--red); border:1px solid rgba(232,64,42,.3); }
-  .btn-danger:hover { background:rgba(232,64,42,.25); }
-  .btn-sm { padding:4px 10px; font-size:12px; }
-
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); backdrop-filter:blur(4px); z-index:100; display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .15s ease; }
-  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-  .modal { background:var(--bg2); border:1px solid var(--border2); border-radius:8px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; animation:slideUp .15s ease; }
-  @keyframes slideUp { from{transform:translateY(10px);opacity:0} to{transform:translateY(0);opacity:1} }
-  .modal-header { padding:18px 22px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
-  .modal-title { font-family:'Rajdhani',sans-serif; font-size:19px; font-weight:700; color:var(--text-bright); }
-  .modal-close { background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; padding:4px; transition:color .15s; }
-  .modal-close:hover { color:var(--text-bright); }
-  .modal-body { padding:18px 22px; display:flex; flex-direction:column; gap:14px; }
-  .modal-footer { padding:14px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; }
-
-  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .form-group { display:flex; flex-direction:column; gap:5px; }
-  .form-group.full { grid-column:1/-1; }
-  .form-label { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
-  .form-input,.form-select,.form-textarea { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:8px 11px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:14px; outline:none; transition:border-color .15s; width:100%; }
-  .form-input:focus,.form-select:focus,.form-textarea:focus { border-color:var(--amber); }
-  .form-select { appearance:none; cursor:pointer; }
-  .form-textarea { resize:vertical; min-height:76px; }
-
-  ::-webkit-scrollbar { width:5px; height:5px; }
-  ::-webkit-scrollbar-track { background:var(--bg); }
-  ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
-
-  @media (max-width:640px) {
-    .sidebar { width:200px; }
-    .topbar-stats { display:none; }
-    .service-record { grid-template-columns:1fr auto; }
-    .sr-date-col { display:none; }
-    .form-row { grid-template-columns:1fr; }
-  }
-  @media (max-width:480px) {
-    .sidebar { display:none; }
-    .main-content { padding:16px; }
-  }
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0f12; --bg2: #141619; --bg3: #1a1d22; --panel: #1e2128;
+      --border: #2a2e38; --border2: #353a47; --amber: #f5a623; --amber-dim: #c47e0e;
+      --red: #e8402a; --green: #3dba6f; --text: #d4d8e2; --text-dim: #7a8099;
+      --text-bright: #eef0f5; --sidebar-w: 240px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; margin: 0; }
+    .shell { display: flex; flex-direction: column; height: 100vh; max-width: 1200px; margin: 0 auto; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 12px; }
+    .topbar-brand { display: flex; align-items: baseline; gap: 10px; }
+    .topbar-eyebrow { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; }
+    .topbar-title { font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700; color: var(--text-bright); letter-spacing: 1px; line-height: 1; }
+    .topbar-title span { color: var(--amber); }
+    .topbar-stats { display: flex; gap: 20px; }
+    .ts-item { text-align: center; }
+    .ts-val { font-family: 'Rajdhani', sans-serif; font-size: 18px; font-weight: 700; color: var(--amber); line-height: 1; }
+    .ts-lbl { font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; }
+    .body { display: flex; flex: 1; overflow: hidden; }
+    .sidebar { width: var(--sidebar-w); flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; background: var(--bg2); }
+    .sidebar-header { padding: 12px 14px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .sidebar-label { font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+    .sidebar-list { overflow-y: auto; flex: 1; padding: 6px 0; }
+    .sidebar-item { display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer; transition: background .12s; border-left: 3px solid transparent; }
+    .sidebar-item:hover { background: var(--bg3); }
+    .sidebar-item.active { background: rgba(245,166,35,.08); border-left-color: var(--amber); }
+    .si-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+    .si-info { flex: 1; min-width: 0; }
+    .si-name { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+    .sidebar-item.active .si-name { color: var(--amber); }
+    .si-sub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .si-count { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-dim); background: var(--bg3); padding: 1px 6px; border-radius: 10px; flex-shrink: 0; }
+    .sidebar-item.active .si-count { background: rgba(245,166,35,.15); color: var(--amber); }
+    .sidebar-divider { height: 1px; background: var(--border); margin: 6px 0; }
+    .sidebar-add { margin: 8px 10px 10px; padding: 8px; border: 1px dashed var(--border2); border-radius: 4px; background: none; color: var(--text-dim); font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 600; letter-spacing: 0.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: border-color .15s, color .15s; flex-shrink: 0; }
+    .sidebar-add:hover { border-color: var(--amber); color: var(--amber); }
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .main-content { flex: 1; overflow-y: auto; padding: 24px; }
+    .overview-title { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px; }
+    .overview-sub { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; }
+    .fleet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+    .vehicle-card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 18px; cursor: pointer; transition: border-color .15s, transform .1s; position: relative; overflow: hidden; }
+    .vehicle-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--amber); opacity:0; transition:opacity .15s; }
+    .vehicle-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+    .vehicle-card:hover::before { opacity: 1; }
+    .vc-type { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--amber); text-transform:uppercase; margin-bottom:5px; }
+    .vc-name { font-family:'Rajdhani',sans-serif; font-size:18px; font-weight:700; color:var(--text-bright); margin-bottom:3px; }
+    .vc-sub { font-size:12px; color:var(--text-dim); margin-bottom:12px; }
+    .vc-meta { display:flex; gap:14px; flex-wrap:wrap; }
+    .vc-stat { display:flex; flex-direction:column; gap:1px; }
+    .vc-stat-label { font-size:9px; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim); font-family:'Share Tech Mono',monospace; }
+    .vc-stat-val { font-size:14px; font-weight:600; color:var(--text); }
+    .vc-last { margin-top:10px; font-size:11px; color:var(--text-dim); }
+    .summary-bar { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+    .summary-stat { background:var(--panel); border:1px solid var(--border); border-radius:4px; padding:10px 16px; flex:1; min-width:90px; }
+    .summary-stat-val { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:var(--amber); line-height:1; }
+    .summary-stat-lbl { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; color:var(--text-dim); text-transform:uppercase; margin-top:3px; }
+    .service-list { display:flex; flex-direction:column; gap:10px; }
+    .service-record { background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--amber-dim); border-radius:4px; padding:14px 18px; display:grid; grid-template-columns:56px 1fr auto; gap:14px; align-items:start; transition:border-color .15s; }
+    .service-record:hover { border-left-color:var(--amber); }
+    .sr-date-col { text-align:center; }
+    .sr-date-day { font-family:'Rajdhani',sans-serif; font-size:24px; font-weight:700; color:var(--amber); line-height:1; }
+    .sr-date-mon { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--text-dim); text-transform:uppercase; }
+    .sr-date-yr { font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--text-dim); }
+    .sr-type { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--text-bright); margin-bottom:3px; }
+    .sr-notes { font-size:13px; color:var(--text-dim); line-height:1.4; margin-bottom:6px; }
+    .sr-tags { display:flex; gap:6px; flex-wrap:wrap; }
+    .sr-tag { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--text-dim); background:var(--bg3); padding:2px 7px; border-radius:3px; }
+    .sr-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+    .sr-cost { font-family:'Share Tech Mono',monospace; font-size:14px; color:var(--green); }
+    .vehicle-info-card { background:var(--panel); border:1px solid var(--border); border-radius:6px; margin-bottom:20px; overflow:hidden; }
+    .vic-top { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 20px 14px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .vic-identity { display:flex; align-items:center; gap:14px; }
+    .vic-icon-wrap { width:48px; height:48px; border-radius:6px; background:rgba(245,166,35,.1); border:1px solid rgba(245,166,35,.25); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+    .vic-name { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:var(--text-bright); line-height:1; margin-bottom:3px; }
+    .vic-type-badge { display:inline-block; font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--amber); background:rgba(245,166,35,.1); padding:2px 8px; border-radius:3px; }
+    .vic-actions { display:flex; gap:8px; flex-shrink:0; }
+    .vic-specs { display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:0; }
+    .vic-spec { padding:12px 18px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+    .vic-spec:last-child { border-right:none; }
+    .vic-spec-label { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
+    .vic-spec-val { font-size:14px; font-weight:600; color:var(--text-bright); font-family:'Rajdhani',sans-serif; }
+    .vic-notes-row { padding:10px 18px; font-size:13px; color:var(--text-dim); font-style:italic; border-top:1px solid var(--border); }
+    .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
+    .empty-icon { font-size:44px; margin-bottom:12px; }
+    .empty-title { font-family:'Rajdhani',sans-serif; font-size:20px; font-weight:600; margin-bottom:6px; color:var(--text); }
+    .empty-sub { font-size:14px; }
+    .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:4px; font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; letter-spacing:0.5px; cursor:pointer; border:none; transition:background .15s; }
+    .btn-primary { background:var(--amber); color:#0d0f12; }
+    .btn-primary:hover { background:#f0b84e; }
+    .btn-ghost { background:var(--bg3); color:var(--text); border:1px solid var(--border2); }
+    .btn-ghost:hover { border-color:var(--amber); color:var(--amber); }
+    .btn-danger { background:rgba(232,64,42,.15); color:var(--red); border:1px solid rgba(232,64,42,.3); }
+    .btn-danger:hover { background:rgba(232,64,42,.25); }
+    .btn-sm { padding:4px 10px; font-size:12px; }
+    .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); backdrop-filter:blur(4px); z-index:100; display:flex; align-items:center; justify-content:center; padding:16px; }
+    .modal { background:var(--bg2); border:1px solid var(--border2); border-radius:8px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; }
+    .modal-header { padding:18px 22px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .modal-title { font-family:'Rajdhani',sans-serif; font-size:19px; font-weight:700; color:var(--text-bright); }
+    .modal-close { background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:18px; line-height:1; padding:4px; }
+    .modal-close:hover { color:var(--text-bright); }
+    .modal-body { padding:18px 22px; display:flex; flex-direction:column; gap:14px; }
+    .modal-footer { padding:14px 22px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .form-group { display:flex; flex-direction:column; gap:5px; }
+    .form-group.full { grid-column:1/-1; }
+    .form-label { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); }
+    .form-input, .form-select, .form-textarea { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:8px 11px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:14px; outline:none; transition:border-color .15s; width:100%; }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color:var(--amber); }
+    .form-select { appearance:none; cursor:pointer; }
+    .form-textarea { resize:vertical; min-height:76px; }
+    ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background:var(--bg); } ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    @media (max-width:640px) { .sidebar { width:200px; } .topbar-stats { display:none; } .service-record { grid-template-columns:1fr auto; } .sr-date-col { display:none; } .form-row { grid-template-columns:1fr; } }
+    @media (max-width:480px) { .sidebar { display:none; } .main-content { padding:16px; } }
   </style>
 </head>
-<body style="margin:0;padding:0;background:#0d0f12;">
+<body>
   <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script type="text/babel">
+  <script>
     const { useState } = React;
+    const html = htm.bind(React.createElement);
 
+    const ICONS = { Truck:"🚛",Tractor:"🚜",Combine:"🌾","Grain Cart":"⚙",Semi:"🚛",Trailer:"📦",Sprayer:"💧",Pickup:"🛻","ATV/UTV":"🏎",Generator:"⚡",Other:"🔧" };
+    const SERVICE_TYPES = ["Oil Change","Filter Replacement","Tire Service","Brake Service","Hydraulic Service","Belt/Chain Replacement","Coolant Service","Fuel System","Battery/Electrical","Inspection","Repair","Other"];
+    const EQUIPMENT_TYPES = ["Truck","Tractor","Combine","Grain Cart","Semi","Trailer","Sprayer","Pickup","ATV/UTV","Generator","Other"];
 
-
-const ICONS = { Truck:"🚛",Tractor:"🚜",Combine:"🌾","Grain Cart":"⚙",Semi:"🚛",Trailer:"📦",Sprayer:"💧",Pickup:"🛻","ATV/UTV":"🏎",Generator:"⚡",Other:"🔧" };
-const SERVICE_TYPES = ["Oil Change","Filter Replacement","Tire Service","Brake Service","Hydraulic Service","Belt/Chain Replacement","Coolant Service","Fuel System","Battery/Electrical","Inspection","Repair","Other"];
-const EQUIPMENT_TYPES = ["Truck","Tractor","Combine","Grain Cart","Semi","Trailer","Sprayer","Pickup","ATV/UTV","Generator","Other"];
-
-function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-function fmtDate(iso) {
-  const d = new Date(iso+"T00:00:00");
-  return { day:d.getDate().toString().padStart(2,'0'), mon:d.toLocaleString('en',{month:'short'}).toUpperCase(), yr:d.getFullYear() };
-}
-function sumCost(recs) { return recs.reduce((s,r)=>s+(parseFloat(r.cost)||0),0); }
-
-const STORAGE_KEY = "svc_tracker_v1";
-function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||null; } catch { return null; } }
-function saveData(d) { localStorage.setItem(STORAGE_KEY,JSON.stringify(d)); }
-
-const SEED = {
-  vehicles:[
-    {id:"v1",name:"2019 Peterbilt 579",type:"Semi",      year:"2019",make:"Peterbilt", model:"579",  vin:"1XPWD49X1ND",hours:"148500",notes:"Grain hauler - primary"},
-    {id:"v2",name:"JD 9620R",          type:"Tractor",   year:"2021",make:"John Deere",model:"9620R",vin:"",           hours:"2840",  notes:""},
-    {id:"v3",name:"Grain Cart #1",     type:"Grain Cart",year:"2018",make:"Unverferth",model:"810",  vin:"",           hours:"1200",  notes:"1000bu capacity"},
-  ],
-  records:[
-    {id:"r1",vehicleId:"v1",date:"2024-10-14",type:"Oil Change",          notes:"15W-40 full synthetic, replaced filters",    cost:"420",  hours:"146200",tech:"Self"},
-    {id:"r2",vehicleId:"v1",date:"2025-03-01",type:"Tire Service",        notes:"Replaced steer tires, rotated drives",        cost:"1850", hours:"147900",tech:"Truck Stop"},
-    {id:"r3",vehicleId:"v2",date:"2025-05-15",type:"Oil Change",          notes:"JD Plus-50 II 15W-40, new oil filter",        cost:"310",  hours:"2640",  tech:"Self"},
-    {id:"r4",vehicleId:"v2",date:"2025-08-22",type:"Hydraulic Service",   notes:"Hydraulic filter, fluid top-off",             cost:"185",  hours:"2790",  tech:"Self"},
-    {id:"r5",vehicleId:"v3",date:"2025-09-10",type:"Belt/Chain Replacement",notes:"Auger chain and sprocket, pre-harvest",     cost:"640",  hours:"1180",  tech:"Self"},
-  ]
-};
-
-function App() {
-  const [data,setData] = useState(()=>{
-    const d = loadData();
-    if (!d||!d.vehicles?.length){saveData(SEED);return SEED;}
-    return d;
-  });
-  const [selectedId,setSelectedId] = useState(null);
-  const [modal,setModal] = useState(null);
-  const [editTarget,setEditTarget] = useState(null);
-
-  function update(next){setData(next);saveData(next);}
-
-  const {vehicles,records:allRecords} = data;
-  const selected = vehicles.find(v=>v.id===selectedId)||null;
-  const vRecords = selected ? allRecords.filter(r=>r.vehicleId===selectedId).sort((a,b)=>b.date.localeCompare(a.date)) : [];
-
-  function saveVehicle(form){
-    if(editTarget){
-      update({...data,vehicles:vehicles.map(v=>v.id===editTarget.id?{...editTarget,...form}:v)});
-    } else {
-      const nv={id:uid(),...form};
-      update({...data,vehicles:[...vehicles,nv]});
-      setSelectedId(nv.id);
+    function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+    function fmtDate(iso) {
+      const d = new Date(iso+"T00:00:00");
+      return { day:d.getDate().toString().padStart(2,'0'), mon:d.toLocaleString('en',{month:'short'}).toUpperCase(), yr:d.getFullYear() };
     }
-    setModal(null);setEditTarget(null);
-  }
+    function sumCost(recs) { return recs.reduce((s,r)=>s+(parseFloat(r.cost)||0),0); }
 
-  function deleteVehicle(id){
-    if(!confirm("Delete this vehicle and all its service records?"))return;
-    update({vehicles:vehicles.filter(v=>v.id!==id),records:allRecords.filter(r=>r.vehicleId!==id)});
-    if(selectedId===id)setSelectedId(null);
-  }
+    const STORAGE_KEY = "svc_tracker_v1";
+    function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||null; } catch { return null; } }
+    function saveData(d) { localStorage.setItem(STORAGE_KEY,JSON.stringify(d)); }
 
-  function saveRecord(form){
-    let updatedVehicles = vehicles;
-    if(form.hours){
-      const newHrs = parseFloat(form.hours);
-      const veh = vehicles.find(v=>v.id===selectedId);
-      if(veh && newHrs > (parseFloat(veh.hours)||0)){
-        updatedVehicles = vehicles.map(v=>v.id===selectedId ? {...v, hours: String(newHrs)} : v);
-      }
-    }
-    if(editTarget){
-      update({...data, vehicles:updatedVehicles, records:allRecords.map(r=>r.id===editTarget.id?{...editTarget,...form}:r)});
-    } else {
-      update({...data, vehicles:updatedVehicles, records:[...allRecords,{id:uid(),vehicleId:selectedId,...form}]});
-    }
-    setModal(null);setEditTarget(null);
-  }
+    const SEED = {
+      vehicles:[
+        {id:"v1",name:"2019 Peterbilt 579",type:"Semi",year:"2019",make:"Peterbilt",model:"579",vin:"1XPWD49X1ND",hours:"148500",notes:"Grain hauler - primary"},
+        {id:"v2",name:"JD 9620R",type:"Tractor",year:"2021",make:"John Deere",model:"9620R",vin:"",hours:"2840",notes:""},
+        {id:"v3",name:"Grain Cart #1",type:"Grain Cart",year:"2018",make:"Unverferth",model:"810",vin:"",hours:"1200",notes:"1000bu capacity"},
+      ],
+      records:[
+        {id:"r1",vehicleId:"v1",date:"2024-10-14",type:"Oil Change",notes:"15W-40 full synthetic, replaced filters",cost:"420",hours:"146200",tech:"Self"},
+        {id:"r2",vehicleId:"v1",date:"2025-03-01",type:"Tire Service",notes:"Replaced steer tires, rotated drives",cost:"1850",hours:"147900",tech:"Truck Stop"},
+        {id:"r3",vehicleId:"v2",date:"2025-05-15",type:"Oil Change",notes:"JD Plus-50 II 15W-40, new oil filter",cost:"310",hours:"2640",tech:"Self"},
+        {id:"r4",vehicleId:"v2",date:"2025-08-22",type:"Hydraulic Service",notes:"Hydraulic filter, fluid top-off",cost:"185",hours:"2790",tech:"Self"},
+        {id:"r5",vehicleId:"v3",date:"2025-09-10",type:"Belt/Chain Replacement",notes:"Auger chain and sprocket, pre-harvest",cost:"640",hours:"1180",tech:"Self"},
+      ]
+    };
 
-  function deleteRecord(id){
-    if(!confirm("Delete this service record?"))return;
-    update({...data,records:allRecords.filter(r=>r.id!==id)});
-  }
-
-  return (
-    <>
-      <div className="shell">
-
-        {/* TOPBAR */}
-        <div className="topbar">
-          <div className="topbar-brand">
-            <div className="topbar-eyebrow">⚙ Fleet</div>
-            <div className="topbar-title">SERVICE<span>LOG</span></div>
-          </div>
-          <div className="topbar-stats">
-            <div className="ts-item"><div className="ts-val">{vehicles.length}</div><div className="ts-lbl">Equipment</div></div>
-            <div className="ts-item"><div className="ts-val">{allRecords.length}</div><div className="ts-lbl">Records</div></div>
-            <div className="ts-item"><div className="ts-val">${sumCost(allRecords).toLocaleString()}</div><div className="ts-lbl">Total Spent</div></div>
-          </div>
-          {selected
-            ? <button className="btn btn-primary" onClick={()=>{setEditTarget(null);setModal('addRecord');}}>+ Log Service</button>
-            : <button className="btn btn-primary" onClick={()=>{setEditTarget(null);setModal('addVehicle');}}>+ Add Equipment</button>
-          }
-        </div>
-
-        <div className="body">
-          {/* SIDEBAR */}
-          <div className="sidebar">
-            <div className="sidebar-header">
-              <span className="sidebar-label">Fleet</span>
-              <span style={{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"var(--text-dim)"}}>{vehicles.length}</span>
+    function VehicleModal({initial, onSave, onClose}) {
+      const [form, setForm] = useState({
+        name:initial?.name||'', type:initial?.type||'Tractor', year:initial?.year||'',
+        make:initial?.make||'', model:initial?.model||'', vin:initial?.vin||'',
+        hours:initial?.hours||'', notes:initial?.notes||'',
+      });
+      const set = (k,v) => setForm(f=>({...f,[k]:v}));
+      function submit() { if(!form.name.trim()) return alert("Name is required."); onSave(form); }
+      return html`
+        <div class="modal-overlay" onClick=${onClose}>
+          <div class="modal" onClick=${e=>e.stopPropagation()}>
+            <div class="modal-header">
+              <div class="modal-title">${initial?'Edit Equipment':'Add Equipment'}</div>
+              <button class="modal-close" onClick=${onClose}>✕</button>
             </div>
-            <div className="sidebar-list">
-              <div className={`sidebar-item ${!selectedId?'active':''}`} onClick={()=>setSelectedId(null)}>
-                <span className="si-icon">🗂</span>
-                <div className="si-info">
-                  <div className="si-name">All Equipment</div>
-                  <div className="si-sub">Fleet overview</div>
+            <div class="modal-body">
+              <div class="form-row">
+                <div class="form-group full"><label class="form-label">Name / Nickname *</label><input class="form-input" value=${form.name} onInput=${e=>set('name',e.target.value)} placeholder="e.g. JD 9620R" /></div>
+                <div class="form-group"><label class="form-label">Type</label>
+                  <select class="form-select" value=${form.type} onChange=${e=>set('type',e.target.value)}>
+                    ${EQUIPMENT_TYPES.map(t=>html`<option key=${t} value=${t}>${t}</option>`)}
+                  </select>
                 </div>
+                <div class="form-group"><label class="form-label">Year</label><input class="form-input" value=${form.year} onInput=${e=>set('year',e.target.value)} placeholder="2021" /></div>
+                <div class="form-group"><label class="form-label">Make</label><input class="form-input" value=${form.make} onInput=${e=>set('make',e.target.value)} placeholder="John Deere" /></div>
+                <div class="form-group"><label class="form-label">Model</label><input class="form-input" value=${form.model} onInput=${e=>set('model',e.target.value)} placeholder="9620R" /></div>
+                <div class="form-group"><label class="form-label">VIN / Serial</label><input class="form-input" value=${form.vin} onInput=${e=>set('vin',e.target.value)} placeholder="Optional" /></div>
+                <div class="form-group"><label class="form-label">Current Hours / Miles</label><input class="form-input" type="number" value=${form.hours} onInput=${e=>set('hours',e.target.value)} placeholder="0" /></div>
+                <div class="form-group full"><label class="form-label">Notes</label><textarea class="form-textarea" onInput=${e=>set('notes',e.target.value)} placeholder="Additional notes...">${form.notes}</textarea></div>
               </div>
-              <div className="sidebar-divider" />
-              {vehicles.map(v=>{
-                const cnt = allRecords.filter(r=>r.vehicleId===v.id).length;
-                const lastRec = allRecords.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
-                return (
-                  <div key={v.id} className={`sidebar-item ${selectedId===v.id?'active':''}`} onClick={()=>setSelectedId(v.id)}>
-                    <span className="si-icon">{ICONS[v.type]||'🔧'}</span>
-                    <div className="si-info">
-                      <div className="si-name">{v.name}</div>
-                      <div className="si-sub">{v.type}{v.year?` · ${v.year}`:''}</div>
-                    </div>
-                    {cnt>0 && <span className="si-count">{cnt}</span>}
-                  </div>
-                );
-              })}
             </div>
-            <button className="sidebar-add" onClick={()=>{setEditTarget(null);setModal('addVehicle');}}>
-              ＋ Add Equipment
-            </button>
+            <div class="modal-footer">
+              <button class="btn btn-ghost" onClick=${onClose}>Cancel</button>
+              <button class="btn btn-primary" onClick=${submit}>${initial?'Save Changes':'Add Equipment'}</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function RecordModal({initial, onSave, onClose}) {
+      const today = new Date().toISOString().slice(0,10);
+      const [form, setForm] = useState({
+        date:initial?.date||today, type:initial?.type||'Oil Change', notes:initial?.notes||'',
+        cost:initial?.cost||'', hours:initial?.hours||'', tech:initial?.tech||'',
+      });
+      const set = (k,v) => setForm(f=>({...f,[k]:v}));
+      function submit() { if(!form.date||!form.type) return alert("Date and type required."); onSave(form); }
+      return html`
+        <div class="modal-overlay" onClick=${onClose}>
+          <div class="modal" onClick=${e=>e.stopPropagation()}>
+            <div class="modal-header">
+              <div class="modal-title">${initial?'Edit Service Record':'Log Service'}</div>
+              <button class="modal-close" onClick=${onClose}>✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="form-row">
+                <div class="form-group"><label class="form-label">Date *</label><input class="form-input" type="date" value=${form.date} onChange=${e=>set('date',e.target.value)} /></div>
+                <div class="form-group"><label class="form-label">Service Type *</label>
+                  <select class="form-select" value=${form.type} onChange=${e=>set('type',e.target.value)}>
+                    ${SERVICE_TYPES.map(t=>html`<option key=${t} value=${t}>${t}</option>`)}
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">Cost ($)</label><input class="form-input" type="number" value=${form.cost} onInput=${e=>set('cost',e.target.value)} placeholder="0.00" /></div>
+                <div class="form-group"><label class="form-label">Hours / Miles at Service</label><input class="form-input" type="number" value=${form.hours} onInput=${e=>set('hours',e.target.value)} placeholder="0" /></div>
+                <div class="form-group full"><label class="form-label">Performed By</label><input class="form-input" value=${form.tech} onInput=${e=>set('tech',e.target.value)} placeholder="Self, Dealer, Shop..." /></div>
+                <div class="form-group full"><label class="form-label">Notes / Parts Used</label><textarea class="form-textarea" onInput=${e=>set('notes',e.target.value)} placeholder="Work done, parts replaced, observations...">${form.notes}</textarea></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost" onClick=${onClose}>Cancel</button>
+              <button class="btn btn-primary" onClick=${submit}>${initial?'Save Changes':'Log Service'}</button>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function App() {
+      const [data, setData] = useState(()=>{
+        const d = loadData();
+        if(!d||!d.vehicles?.length){saveData(SEED);return SEED;}
+        return d;
+      });
+      const [selectedId, setSelectedId] = useState(null);
+      const [modal, setModal] = useState(null);
+      const [editTarget, setEditTarget] = useState(null);
+
+      function update(next){setData(next);saveData(next);}
+      const {vehicles, records:allRecords} = data;
+      const selected = vehicles.find(v=>v.id===selectedId)||null;
+      const vRecords = selected ? allRecords.filter(r=>r.vehicleId===selectedId).sort((a,b)=>b.date.localeCompare(a.date)) : [];
+
+      function saveVehicle(form){
+        if(editTarget){
+          update({...data,vehicles:vehicles.map(v=>v.id===editTarget.id?{...editTarget,...form}:v)});
+        } else {
+          const nv={id:uid(),...form};
+          update({...data,vehicles:[...vehicles,nv]});
+          setSelectedId(nv.id);
+        }
+        setModal(null);setEditTarget(null);
+      }
+
+      function deleteVehicle(id){
+        if(!confirm("Delete this vehicle and all its service records?"))return;
+        update({vehicles:vehicles.filter(v=>v.id!==id),records:allRecords.filter(r=>r.vehicleId!==id)});
+        if(selectedId===id)setSelectedId(null);
+      }
+
+      function saveRecord(form){
+        let updatedVehicles = vehicles;
+        if(form.hours){
+          const newHrs = parseFloat(form.hours);
+          const veh = vehicles.find(v=>v.id===selectedId);
+          if(veh && newHrs>(parseFloat(veh.hours)||0)){
+            updatedVehicles = vehicles.map(v=>v.id===selectedId?{...v,hours:String(newHrs)}:v);
+          }
+        }
+        if(editTarget){
+          update({...data,vehicles:updatedVehicles,records:allRecords.map(r=>r.id===editTarget.id?{...editTarget,...form}:r)});
+        } else {
+          update({...data,vehicles:updatedVehicles,records:[...allRecords,{id:uid(),vehicleId:selectedId,...form}]});
+        }
+        setModal(null);setEditTarget(null);
+      }
+
+      function deleteRecord(id){
+        if(!confirm("Delete this service record?"))return;
+        update({...data,records:allRecords.filter(r=>r.id!==id)});
+      }
+
+      return html`
+        <div class="shell">
+          <div class="topbar">
+            <div class="topbar-brand">
+              <div class="topbar-eyebrow">⚙ Fleet</div>
+              <div class="topbar-title">SERVICE<span>LOG</span></div>
+            </div>
+            <div class="topbar-stats">
+              <div class="ts-item"><div class="ts-val">${vehicles.length}</div><div class="ts-lbl">Equipment</div></div>
+              <div class="ts-item"><div class="ts-val">${allRecords.length}</div><div class="ts-lbl">Records</div></div>
+              <div class="ts-item"><div class="ts-val">$${sumCost(allRecords).toLocaleString()}</div><div class="ts-lbl">Total Spent</div></div>
+            </div>
+            ${selected
+              ? html`<button class="btn btn-primary" onClick=${()=>{setEditTarget(null);setModal('addRecord');}}>+ Log Service</button>`
+              : html`<button class="btn btn-primary" onClick=${()=>{setEditTarget(null);setModal('addVehicle');}}>+ Add Equipment</button>`
+            }
           </div>
 
-          {/* MAIN */}
-          <div className="main">
-            <div className="main-content">
-
-              {!selected && (
-                <>
-                  <div className="overview-title">Fleet Overview</div>
-                  <div className="overview-sub">Select a vehicle from the sidebar, or add new equipment to get started.</div>
-                  <div className="summary-bar">
-                    <div className="summary-stat"><div className="summary-stat-val">{vehicles.length}</div><div className="summary-stat-lbl">Equipment</div></div>
-                    <div className="summary-stat"><div className="summary-stat-val">{allRecords.length}</div><div className="summary-stat-lbl">Records</div></div>
-                    <div className="summary-stat"><div className="summary-stat-val">${sumCost(allRecords).toLocaleString()}</div><div className="summary-stat-lbl">Total Spent</div></div>
+          <div class="body">
+            <div class="sidebar">
+              <div class="sidebar-header">
+                <span class="sidebar-label">Fleet</span>
+                <span style=${{fontFamily:"'Share Tech Mono',monospace",fontSize:11,color:"var(--text-dim)"}}>${vehicles.length}</span>
+              </div>
+              <div class="sidebar-list">
+                <div class=${"sidebar-item"+((!selectedId)?" active":"")} onClick=${()=>setSelectedId(null)}>
+                  <span class="si-icon">🗂</span>
+                  <div class="si-info">
+                    <div class="si-name">All Equipment</div>
+                    <div class="si-sub">Fleet overview</div>
                   </div>
-                  <div className="fleet-grid">
-                    {vehicles.map(v=>{
+                </div>
+                <div class="sidebar-divider"></div>
+                ${vehicles.map(v=>{
+                  const cnt = allRecords.filter(r=>r.vehicleId===v.id).length;
+                  return html`
+                    <div key=${v.id} class=${"sidebar-item"+(selectedId===v.id?" active":"")} onClick=${()=>setSelectedId(v.id)}>
+                      <span class="si-icon">${ICONS[v.type]||'🔧'}</span>
+                      <div class="si-info">
+                        <div class="si-name">${v.name}</div>
+                        <div class="si-sub">${v.type}${v.year?' · '+v.year:''}</div>
+                      </div>
+                      ${cnt>0 ? html`<span class="si-count">${cnt}</span>` : null}
+                    </div>`;
+                })}
+              </div>
+              <button class="sidebar-add" onClick=${()=>{setEditTarget(null);setModal('addVehicle');}}>＋ Add Equipment</button>
+            </div>
+
+            <div class="main">
+              <div class="main-content">
+                ${!selected ? html`
+                  <div class="overview-title">Fleet Overview</div>
+                  <div class="overview-sub">Select a vehicle from the sidebar, or add new equipment.</div>
+                  <div class="summary-bar">
+                    <div class="summary-stat"><div class="summary-stat-val">${vehicles.length}</div><div class="summary-stat-lbl">Equipment</div></div>
+                    <div class="summary-stat"><div class="summary-stat-val">${allRecords.length}</div><div class="summary-stat-lbl">Records</div></div>
+                    <div class="summary-stat"><div class="summary-stat-val">$${sumCost(allRecords).toLocaleString()}</div><div class="summary-stat-lbl">Total Spent</div></div>
+                  </div>
+                  <div class="fleet-grid">
+                    ${vehicles.map(v=>{
                       const recs = allRecords.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date));
-                      return (
-                        <div key={v.id} className="vehicle-card" onClick={()=>setSelectedId(v.id)}>
-                          <div className="vc-type">{ICONS[v.type]} {v.type}</div>
-                          <div className="vc-name">{v.name}</div>
-                          <div className="vc-sub">{[v.year,v.make,v.model].filter(Boolean).join(' · ')}</div>
-                          <div className="vc-meta">
-                            <div className="vc-stat"><div className="vc-stat-label">Records</div><div className="vc-stat-val">{recs.length}</div></div>
-                            <div className="vc-stat"><div className="vc-stat-label">Cost</div><div className="vc-stat-val">${sumCost(recs).toLocaleString()}</div></div>
-                            {v.hours&&<div className="vc-stat"><div className="vc-stat-label">Hrs/Mi</div><div className="vc-stat-val">{Number(v.hours).toLocaleString()}</div></div>}
+                      return html`
+                        <div key=${v.id} class="vehicle-card" onClick=${()=>setSelectedId(v.id)}>
+                          <div class="vc-type">${ICONS[v.type]} ${v.type}</div>
+                          <div class="vc-name">${v.name}</div>
+                          <div class="vc-sub">${[v.year,v.make,v.model].filter(Boolean).join(' · ')}</div>
+                          <div class="vc-meta">
+                            <div class="vc-stat"><div class="vc-stat-label">Records</div><div class="vc-stat-val">${recs.length}</div></div>
+                            <div class="vc-stat"><div class="vc-stat-label">Cost</div><div class="vc-stat-val">$${sumCost(recs).toLocaleString()}</div></div>
+                            ${v.hours?html`<div class="vc-stat"><div class="vc-stat-label">Hrs/Mi</div><div class="vc-stat-val">${Number(v.hours).toLocaleString()}</div></div>`:null}
                           </div>
-                          {recs[0]&&<div className="vc-last">Last: {recs[0].type} — {recs[0].date}</div>}
-                        </div>
-                      );
+                          ${recs[0]?html`<div class="vc-last">Last: ${recs[0].type} — ${recs[0].date}</div>`:null}
+                        </div>`;
                     })}
-                  </div>
-                </>
-              )}
+                  </div>` : null}
 
-              {selected && (
-                <>
-                  {/* VEHICLE INFO CARD */}
-                  <div className="vehicle-info-card">
-                    <div className="vic-top">
-                      <div className="vic-identity">
-                        <div className="vic-icon-wrap">{ICONS[selected.type]||'🔧'}</div>
+                ${selected ? html`
+                  <div class="vehicle-info-card">
+                    <div class="vic-top">
+                      <div class="vic-identity">
+                        <div class="vic-icon-wrap">${ICONS[selected.type]||'🔧'}</div>
                         <div>
-                          <div className="vic-name">{selected.name}</div>
-                          <span className="vic-type-badge">{selected.type}</span>
+                          <div class="vic-name">${selected.name}</div>
+                          <span class="vic-type-badge">${selected.type}</span>
                         </div>
                       </div>
-                      <div className="vic-actions">
-                        <button className="btn btn-ghost btn-sm" onClick={()=>{setEditTarget(selected);setModal('editVehicle');}}>Edit</button>
-                        <button className="btn btn-danger btn-sm" onClick={()=>deleteVehicle(selected.id)}>Delete</button>
+                      <div class="vic-actions">
+                        <button class="btn btn-ghost btn-sm" onClick=${()=>{setEditTarget(selected);setModal('editVehicle');}}>Edit</button>
+                        <button class="btn btn-danger btn-sm" onClick=${()=>deleteVehicle(selected.id)}>Delete</button>
                       </div>
                     </div>
-                    <div className="vic-specs">
-                      {selected.year && <div className="vic-spec"><div className="vic-spec-label">Year</div><div className="vic-spec-val">{selected.year}</div></div>}
-                      {selected.make && <div className="vic-spec"><div className="vic-spec-label">Make</div><div className="vic-spec-val">{selected.make}</div></div>}
-                      {selected.model && <div className="vic-spec"><div className="vic-spec-label">Model</div><div className="vic-spec-val">{selected.model}</div></div>}
-                      {selected.hours && <div className="vic-spec"><div className="vic-spec-label">Hrs / Miles</div><div className="vic-spec-val">{Number(selected.hours).toLocaleString()}</div></div>}
-                      {selected.vin && <div className="vic-spec"><div className="vic-spec-label">VIN / Serial</div><div className="vic-spec-val" style={{fontSize:12,letterSpacing:'0.5px'}}>{selected.vin}</div></div>}
-                      <div className="vic-spec"><div className="vic-spec-label">Records</div><div className="vic-spec-val">{vRecords.length}</div></div>
-                      <div className="vic-spec"><div className="vic-spec-label">Total Cost</div><div className="vic-spec-val" style={{color:'var(--green)'}}>${sumCost(vRecords).toLocaleString()}</div></div>
-                      {vRecords[0] && <div className="vic-spec"><div className="vic-spec-label">Last Service</div><div className="vic-spec-val" style={{fontSize:13}}>{vRecords[0].date}</div></div>}
+                    <div class="vic-specs">
+                      ${selected.year?html`<div class="vic-spec"><div class="vic-spec-label">Year</div><div class="vic-spec-val">${selected.year}</div></div>`:null}
+                      ${selected.make?html`<div class="vic-spec"><div class="vic-spec-label">Make</div><div class="vic-spec-val">${selected.make}</div></div>`:null}
+                      ${selected.model?html`<div class="vic-spec"><div class="vic-spec-label">Model</div><div class="vic-spec-val">${selected.model}</div></div>`:null}
+                      ${selected.hours?html`<div class="vic-spec"><div class="vic-spec-label">Hrs / Miles</div><div class="vic-spec-val">${Number(selected.hours).toLocaleString()}</div></div>`:null}
+                      ${selected.vin?html`<div class="vic-spec"><div class="vic-spec-label">VIN / Serial</div><div class="vic-spec-val" style=${{fontSize:12}}>${selected.vin}</div></div>`:null}
+                      <div class="vic-spec"><div class="vic-spec-label">Records</div><div class="vic-spec-val">${vRecords.length}</div></div>
+                      <div class="vic-spec"><div class="vic-spec-label">Total Cost</div><div class="vic-spec-val" style=${{color:'var(--green)'}}>$${sumCost(vRecords).toLocaleString()}</div></div>
+                      ${vRecords[0]?html`<div class="vic-spec"><div class="vic-spec-label">Last Service</div><div class="vic-spec-val" style=${{fontSize:13}}>${vRecords[0].date}</div></div>`:null}
                     </div>
-                    {selected.notes && <div className="vic-notes-row">📝 {selected.notes}</div>}
+                    ${selected.notes?html`<div class="vic-notes-row">📝 ${selected.notes}</div>`:null}
                   </div>
 
-                  {vRecords.length===0 ? (
-                    <div className="empty-state">
-                      <div className="empty-icon">🔧</div>
-                      <div className="empty-title">No Service Records</div>
-                      <div className="empty-sub">Hit "+ Log Service" to record the first entry.</div>
-                    </div>
-                  ) : (
-                    <div className="service-list">
-                      {vRecords.map(r=>{
+                  ${vRecords.length===0 ? html`
+                    <div class="empty-state">
+                      <div class="empty-icon">🔧</div>
+                      <div class="empty-title">No Service Records</div>
+                      <div class="empty-sub">Hit "+ Log Service" to record the first entry.</div>
+                    </div>` : html`
+                    <div class="service-list">
+                      ${vRecords.map(r=>{
                         const d=fmtDate(r.date);
-                        return (
-                          <div key={r.id} className="service-record">
-                            <div className="sr-date-col">
-                              <div className="sr-date-day">{d.day}</div>
-                              <div className="sr-date-mon">{d.mon}</div>
-                              <div className="sr-date-yr">{d.yr}</div>
+                        return html`
+                          <div key=${r.id} class="service-record">
+                            <div class="sr-date-col">
+                              <div class="sr-date-day">${d.day}</div>
+                              <div class="sr-date-mon">${d.mon}</div>
+                              <div class="sr-date-yr">${d.yr}</div>
                             </div>
                             <div>
-                              <div className="sr-type">{r.type}</div>
-                              {r.notes&&<div className="sr-notes">{r.notes}</div>}
-                              <div className="sr-tags">
-                                {r.tech&&<span className="sr-tag">👤 {r.tech}</span>}
-                                {r.hours&&<span className="sr-tag">⏱ {Number(r.hours).toLocaleString()} hrs/mi</span>}
+                              <div class="sr-type">${r.type}</div>
+                              ${r.notes?html`<div class="sr-notes">${r.notes}</div>`:null}
+                              <div class="sr-tags">
+                                ${r.tech?html`<span class="sr-tag">👤 ${r.tech}</span>`:null}
+                                ${r.hours?html`<span class="sr-tag">⏱ ${Number(r.hours).toLocaleString()} hrs/mi</span>`:null}
                               </div>
                             </div>
-                            <div className="sr-right">
-                              <div className="sr-cost">{r.cost?`$${Number(r.cost).toLocaleString()}`:'—'}</div>
-                              <button className="btn btn-ghost btn-sm" onClick={()=>{setEditTarget(r);setModal('editRecord');}}>Edit</button>
-                              <button className="btn btn-danger btn-sm" onClick={()=>deleteRecord(r.id)}>✕</button>
+                            <div class="sr-right">
+                              <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
+                              <button class="btn btn-ghost btn-sm" onClick=${()=>{setEditTarget(r);setModal('editRecord');}}>Edit</button>
+                              <button class="btn btn-danger btn-sm" onClick=${()=>deleteRecord(r.id)}>✕</button>
                             </div>
-                          </div>
-                        );
+                          </div>`;
                       })}
-                    </div>
-                  )}
-                </>
-              )}
+                    </div>`}
+                ` : null}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {(modal==='addVehicle'||modal==='editVehicle')&&(
-        <VehicleModal initial={editTarget} onSave={saveVehicle} onClose={()=>{setModal(null);setEditTarget(null);}} />
-      )}
-      {(modal==='addRecord'||modal==='editRecord')&&(
-        <RecordModal initial={editTarget} onSave={saveRecord} onClose={()=>{setModal(null);setEditTarget(null);}} />
-      )}
-    </>
-  );
-}
+        ${(modal==='addVehicle'||modal==='editVehicle') ? html`
+          <${VehicleModal} initial=${editTarget} onSave=${saveVehicle} onClose=${()=>{setModal(null);setEditTarget(null);}} />` : null}
+        ${(modal==='addRecord'||modal==='editRecord') ? html`
+          <${RecordModal} initial=${editTarget} onSave=${saveRecord} onClose=${()=>{setModal(null);setEditTarget(null);}} />` : null}
+      `;
+    }
 
-function VehicleModal({initial,onSave,onClose}){
-  const [form,setForm]=useState({
-    name:initial?.name||'',type:initial?.type||'Tractor',year:initial?.year||'',
-    make:initial?.make||'',model:initial?.model||'',vin:initial?.vin||'',
-    hours:initial?.hours||'',notes:initial?.notes||'',
-  });
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  function submit(){if(!form.name.trim())return alert("Name is required.");onSave(form);}
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title">{initial?'Edit Equipment':'Add Equipment'}</div>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <div className="form-row">
-            <div className="form-group full"><label className="form-label">Name / Nickname *</label><input className="form-input" value={form.name} onChange={e=>set('name',e.target.value)} placeholder="e.g. JD 9620R" /></div>
-            <div className="form-group"><label className="form-label">Type</label><select className="form-select" value={form.type} onChange={e=>set('type',e.target.value)}>{EQUIPMENT_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
-            <div className="form-group"><label className="form-label">Year</label><input className="form-input" value={form.year} onChange={e=>set('year',e.target.value)} placeholder="2021" /></div>
-            <div className="form-group"><label className="form-label">Make</label><input className="form-input" value={form.make} onChange={e=>set('make',e.target.value)} placeholder="John Deere" /></div>
-            <div className="form-group"><label className="form-label">Model</label><input className="form-input" value={form.model} onChange={e=>set('model',e.target.value)} placeholder="9620R" /></div>
-            <div className="form-group"><label className="form-label">VIN / Serial</label><input className="form-input" value={form.vin} onChange={e=>set('vin',e.target.value)} placeholder="Optional" /></div>
-            <div className="form-group"><label className="form-label">Current Hours / Miles</label><input className="form-input" type="number" value={form.hours} onChange={e=>set('hours',e.target.value)} placeholder="0" /></div>
-            <div className="form-group full"><label className="form-label">Notes</label><textarea className="form-textarea" value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="Additional notes..." /></div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit}>{initial?'Save Changes':'Add Equipment'}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RecordModal({initial,onSave,onClose}){
-  const today=new Date().toISOString().slice(0,10);
-  const [form,setForm]=useState({
-    date:initial?.date||today,type:initial?.type||'Oil Change',notes:initial?.notes||'',
-    cost:initial?.cost||'',hours:initial?.hours||'',tech:initial?.tech||'',
-  });
-  const set=(k,v)=>setForm(f=>({...f,[k]:v}));
-  function submit(){if(!form.date||!form.type)return alert("Date and type are required.");onSave(form);}
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <div className="modal-header">
-          <div className="modal-title">{initial?'Edit Service Record':'Log Service'}</div>
-          <button className="modal-close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal-body">
-          <div className="form-row">
-            <div className="form-group"><label className="form-label">Date *</label><input className="form-input" type="date" value={form.date} onChange={e=>set('date',e.target.value)} /></div>
-            <div className="form-group"><label className="form-label">Service Type *</label><select className="form-select" value={form.type} onChange={e=>set('type',e.target.value)}>{SERVICE_TYPES.map(t=><option key={t}>{t}</option>)}</select></div>
-            <div className="form-group"><label className="form-label">Cost ($)</label><input className="form-input" type="number" value={form.cost} onChange={e=>set('cost',e.target.value)} placeholder="0.00" /></div>
-            <div className="form-group"><label className="form-label">Hours / Miles at Service</label><input className="form-input" type="number" value={form.hours} onChange={e=>set('hours',e.target.value)} placeholder="0" /></div>
-            <div className="form-group full"><label className="form-label">Performed By</label><input className="form-input" value={form.tech} onChange={e=>set('tech',e.target.value)} placeholder="Self, Dealer, Shop..." /></div>
-            <div className="form-group full"><label className="form-label">Notes / Parts Used</label><textarea className="form-textarea" value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="Work done, parts replaced, observations..." /></div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit}>{initial?'Save Changes':'Log Service'}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+    window.addEventListener('load', function() {
+      ReactDOM.createRoot(document.getElementById('root')).render(html`<${App} />`);
+    });
   </script>
 </body>
 </html>
