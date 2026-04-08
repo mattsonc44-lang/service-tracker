@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ServiceLog â€” Fleet Maintenance Tracker</title>
+  <title>ServiceLog — Fleet Maintenance Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -118,6 +118,22 @@
     .form-select { appearance:none; cursor:pointer; }
     .form-textarea { resize:vertical; min-height:76px; }
     ::-webkit-scrollbar { width:5px; } ::-webkit-scrollbar-track { background:var(--bg); } ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+    /* PHOTO */
+    .si-thumb { width:32px; height:32px; border-radius:4px; object-fit:cover; flex-shrink:0; border:1px solid var(--border2); }
+    .si.active .si-thumb { border-color:var(--amber); }
+    .si-icon { font-size:15px; width:32px; height:32px; text-align:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+    .vc-photo { width:100%; height:120px; object-fit:cover; display:block; }
+    .vc-photo-placeholder { width:100%; height:80px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:28px; }
+    .vc-body { padding:14px 18px 18px; }
+    .vic-photo-banner { width:100%; height:200px; object-fit:cover; display:block; }
+    .vic-photo-placeholder { width:100%; height:80px; background:var(--bg3); display:flex; align-items:center; justify-content:center; font-size:36px; }
+    .vic-icon-wrap img { width:100%; height:100%; object-fit:cover; border-radius:6px; }
+    .photo-upload-area { border:2px dashed var(--border2); border-radius:6px; padding:20px; text-align:center; cursor:pointer; transition:border-color .15s; position:relative; }
+    .photo-upload-area:hover { border-color:var(--amber); }
+    .photo-upload-area input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+    .photo-preview { width:100%; height:160px; object-fit:cover; border-radius:4px; display:block; margin-bottom:8px; }
+    .photo-upload-lbl { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); }
+    .photo-remove { background:rgba(232,64,42,.15); color:var(--red); border:1px solid rgba(232,64,42,.3); border-radius:4px; padding:4px 10px; font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:700; cursor:pointer; margin-top:6px; }
     @media (max-width:640px) { .sidebar { width:200px; } .topbar-stats { display:none; } .sr { grid-template-columns:1fr auto; } .sr-date { display:none; } .form-row { grid-template-columns:1fr; } }
     @media (max-width:480px) { .sidebar { display:none; } .main-content { padding:16px; } }
   </style>
@@ -125,10 +141,11 @@
 <body>
   <div id="app"></div>
   <script>
-    const ICONS = {Truck:"ðŸš›",Tractor:"ðŸšœ",Combine:"ðŸŒ¾","Grain Cart":"âš™",Semi:"ðŸš›",Trailer:"ðŸ“¦",Sprayer:"ðŸ’§",Pickup:"ðŸ›»","ATV/UTV":"ðŸŽ",Generator:"âš¡",Other:"ðŸ”§"};
+    const ICONS = {Truck:"🚛",Tractor:"🚜",Combine:"🌾","Grain Cart":"⚙",Semi:"🚛",Trailer:"📦",Sprayer:"💧",Pickup:"🛻","ATV/UTV":"🏎",Generator:"⚡",Other:"🔧"};
     const SERVICE_TYPES = ["Oil Change","Filter Replacement","Tire Service","Brake Service","Hydraulic Service","Belt/Chain Replacement","Coolant Service","Fuel System","Battery/Electrical","Inspection","Repair","Other"];
     const EQUIPMENT_TYPES = ["Truck","Tractor","Combine","Grain Cart","Semi","Trailer","Sprayer","Pickup","ATV/UTV","Generator","Other"];
     const STORAGE_KEY = "svc_tracker_v1";
+    const PHOTOS_KEY = "svc_photos_v1";
     const SEED = {
       vehicles:[
         {id:"v1",name:"2019 Peterbilt 579",type:"Semi",year:"2019",make:"Peterbilt",model:"579",vin:"1XPWD49X1ND",hours:"148500",notes:"Grain hauler - primary"},
@@ -153,10 +170,31 @@
     function sumCost(recs) { return recs.reduce((s,r)=>s+(parseFloat(r.cost)||0),0); }
     function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||null; } catch { return null; } }
     function saveData(d) { localStorage.setItem(STORAGE_KEY,JSON.stringify(d)); }
+    function loadPhotos() { try { return JSON.parse(localStorage.getItem(PHOTOS_KEY))||{}; } catch { return {}; } }
+    function savePhotos(p) { try { localStorage.setItem(PHOTOS_KEY,JSON.stringify(p)); } catch(e) { alert('Storage full. Try a smaller image.'); } }
+    function compressImage(file, maxW, maxH, quality) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          let w=img.width, h=img.height;
+          if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+          if(h>maxH){w=Math.round(w*maxH/h);h=maxH;}
+          const canvas=document.createElement('canvas');
+          canvas.width=w; canvas.height=h;
+          canvas.getContext('2d').drawImage(img,0,0,w,h);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/jpeg',quality));
+        };
+        img.src=url;
+      });
+    }
 
     let data = (()=>{ const d=loadData(); if(!d||!d.vehicles?.length){saveData(SEED);return SEED;} return d; })();
+    let photos = loadPhotos();
     let selectedId = null;
     let modalState = null;
+    let pendingPhoto = undefined;
 
     function update(next) { data=next; saveData(next); render(); }
 
@@ -170,21 +208,23 @@
         </div>
         <div class="sidebar-list">
           <div class="si${!selectedId?' active':''}" data-action="select" data-id="">
-            <span class="si-icon">ðŸ—‚</span>
+            <span class="si-icon">🗂</span>
             <div class="si-info"><div class="si-name">All Equipment</div><div class="si-sub">Fleet overview</div></div>
           </div>
           <div class="sidebar-div"></div>
           ${data.vehicles.map(v=>`
             <div class="si${selectedId===v.id?' active':''}" data-action="select" data-id="${esc(v.id)}">
-              <span class="si-icon">${ICONS[v.type]||'ðŸ”§'}</span>
+              ${photos[v.id]
+                ? `<img class="si-thumb" src="${photos[v.id]}" alt="" />`
+                : `<span class="si-icon">${ICONS[v.type]||'🔧'}</span>`}
               <div class="si-info">
                 <div class="si-name">${esc(v.name)}</div>
-                <div class="si-sub">${esc(v.type)}${v.year?' Â· '+esc(v.year):''}</div>
+                <div class="si-sub">${esc(v.type)}${v.year?' · '+esc(v.year):''}</div>
               </div>
               ${counts[v.id]?`<span class="si-count">${counts[v.id]}</span>`:''}
             </div>`).join('')}
         </div>
-        <button class="sidebar-add" data-action="add-vehicle">ï¼‹ Add Equipment</button>
+        <button class="sidebar-add" data-action="add-vehicle">＋ Add Equipment</button>
       </div>`;
     }
 
@@ -200,16 +240,20 @@
         <div class="fleet-grid">
           ${data.vehicles.map(v=>{
             const recs = data.records.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date));
+            const photo = photos[v.id];
             return `<div class="vehicle-card" data-action="select" data-id="${esc(v.id)}">
-              <div class="vc-type">${ICONS[v.type]||''} ${esc(v.type)}</div>
+              ${photo ? `<img class="vc-photo" src="${photo}" alt="" />` : `<div class="vc-photo-placeholder">${ICONS[v.type]||'🔧'}</div>`}
+              <div class="vc-body">
+              <div class="vc-type">${esc(v.type)}</div>
               <div class="vc-name">${esc(v.name)}</div>
-              <div class="vc-sub">${esc([v.year,v.make,v.model].filter(Boolean).join(' Â· '))}</div>
+              <div class="vc-sub">${esc([v.year,v.make,v.model].filter(Boolean).join(' · '))}</div>
               <div class="vc-meta">
                 <div class="vc-stat"><div class="vc-stat-lbl">Records</div><div class="vc-stat-val">${recs.length}</div></div>
                 <div class="vc-stat"><div class="vc-stat-lbl">Cost</div><div class="vc-stat-val">$${sumCost(recs).toLocaleString()}</div></div>
                 ${v.hours?`<div class="vc-stat"><div class="vc-stat-lbl">Hrs/Mi</div><div class="vc-stat-val">${Number(v.hours).toLocaleString()}</div></div>`:''}
               </div>
-              ${recs[0]?`<div class="vc-last">Last: ${esc(recs[0].type)} â€” ${esc(recs[0].date)}</div>`:''}
+              ${recs[0]?`<div class="vc-last">Last: ${esc(recs[0].type)} — ${esc(recs[0].date)}</div>`:''}
+              </div>
             </div>`;
           }).join('')}
         </div>`;
@@ -229,7 +273,7 @@
       ].filter(Boolean).join('');
 
       const rows = recs.length===0
-        ? `<div class="empty"><div class="empty-icon">ðŸ”§</div><div class="empty-title">No Service Records</div><div style="font-size:14px">Hit "+ Log Service" to add the first entry.</div></div>`
+        ? `<div class="empty"><div class="empty-icon">🔧</div><div class="empty-title">No Service Records</div><div style="font-size:14px">Hit "+ Log Service" to add the first entry.</div></div>`
         : `<div class="service-list">${recs.map(r=>{
             const d=fmtDate(r.date);
             return `<div class="sr">
@@ -238,23 +282,25 @@
                 <div class="sr-type">${esc(r.type)}</div>
                 ${r.notes?`<div class="sr-notes">${esc(r.notes)}</div>`:''}
                 <div class="sr-tags">
-                  ${r.tech?`<span class="sr-tag">ðŸ‘¤ ${esc(r.tech)}</span>`:''}
-                  ${r.hours?`<span class="sr-tag">â± ${Number(r.hours).toLocaleString()} hrs/mi</span>`:''}
+                  ${r.tech?`<span class="sr-tag">👤 ${esc(r.tech)}</span>`:''}
+                  ${r.hours?`<span class="sr-tag">⏱ ${Number(r.hours).toLocaleString()} hrs/mi</span>`:''}
                 </div>
               </div>
               <div class="sr-right">
-                <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'â€”'}</div>
+                <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
                 <button class="btn btn-ghost btn-sm" data-action="edit-record" data-id="${esc(r.id)}">Edit</button>
-                <button class="btn btn-danger btn-sm" data-action="del-record" data-id="${esc(r.id)}">âœ•</button>
+                <button class="btn btn-danger btn-sm" data-action="del-record" data-id="${esc(r.id)}">✕</button>
               </div>
             </div>`;
           }).join('')}</div>`;
 
+      const photo = photos[v.id];
       return `
         <div class="vic">
+          ${photo ? `<img class="vic-photo-banner" src="${photo}" alt="${esc(v.name)}" />` : `<div class="vic-photo-placeholder">${ICONS[v.type]||'🔧'}</div>`}
           <div class="vic-top">
             <div class="vic-identity">
-              <div class="vic-icon-wrap">${ICONS[v.type]||'ðŸ”§'}</div>
+              <div class="vic-icon-wrap">${photo ? `<img src="${photo}" alt="" />` : (ICONS[v.type]||'🔧')}</div>
               <div><div class="vic-vname">${esc(v.name)}</div><span class="vic-badge">${esc(v.type)}</span></div>
             </div>
             <div class="vic-actions">
@@ -263,7 +309,7 @@
             </div>
           </div>
           <div class="vic-specs">${specs}</div>
-          ${v.notes?`<div class="vic-notes">ðŸ“ ${esc(v.notes)}</div>`:''}
+          ${v.notes?`<div class="vic-notes">📝 ${esc(v.notes)}</div>`:''}
         </div>
         ${rows}`;
     }
@@ -273,7 +319,7 @@
         <div class="modal">
           <div class="modal-hdr">
             <div class="modal-title">${v?'Edit Equipment':'Add Equipment'}</div>
-            <button class="modal-close" data-action="close-modal">âœ•</button>
+            <button class="modal-close" data-action="close-modal">✕</button>
           </div>
           <div class="modal-body">
             <div class="form-row">
@@ -285,6 +331,25 @@
               <div class="form-group"><label class="form-lbl">VIN / Serial</label><input id="f-vin" class="form-input" value="${esc(v?.vin||'')}" placeholder="Optional" /></div>
               <div class="form-group"><label class="form-lbl">Current Hours / Miles</label><input id="f-hours" type="number" class="form-input" value="${esc(v?.hours||'')}" placeholder="0" /></div>
               <div class="form-group form-full"><label class="form-lbl">Notes</label><textarea id="f-notes" class="form-textarea" placeholder="Additional notes...">${esc(v?.notes||'')}</textarea></div>
+              <div class="form-group form-full">
+                <label class="form-lbl">Photo</label>
+                ${(()=>{
+                  const p = pendingPhoto !== undefined ? pendingPhoto : (v ? photos[v.id] : null);
+                  if(p) return `<img class="photo-preview" src="${p}" alt="Preview" />
+                    <div style="display:flex;gap:8px;margin-top:4px">
+                      <div class="photo-upload-area" style="flex:1;padding:10px">
+                        <input type="file" id="f-photo-input" accept="image/*" />
+                        <span class="photo-upload-lbl">Change Photo</span>
+                      </div>
+                      <button class="photo-remove" data-action="remove-photo">Remove</button>
+                    </div>`;
+                  return `<div class="photo-upload-area">
+                    <input type="file" id="f-photo-input" accept="image/*" />
+                    <div style="font-size:28px;margin-bottom:8px">📷</div>
+                    <div class="photo-upload-lbl">Click to upload a photo</div>
+                  </div>`;
+                })()}
+              </div>
             </div>
           </div>
           <div class="modal-footer">
@@ -301,7 +366,7 @@
         <div class="modal">
           <div class="modal-hdr">
             <div class="modal-title">${r?'Edit Service Record':'Log Service'}</div>
-            <button class="modal-close" data-action="close-modal">âœ•</button>
+            <button class="modal-close" data-action="close-modal">✕</button>
           </div>
           <div class="modal-body">
             <div class="form-row">
@@ -335,7 +400,7 @@
       document.getElementById('app').innerHTML = `
         <div class="topbar">
           <div class="topbar-brand">
-            <div class="topbar-eyebrow">âš™ Fleet</div>
+            <div class="topbar-eyebrow">⚙ Fleet</div>
             <div class="topbar-title">SERVICE<span>LOG</span></div>
           </div>
           <div class="topbar-stats">
@@ -355,7 +420,7 @@
     document.getElementById('app').addEventListener('click', function(e) {
       const el = e.target.closest('[data-action]');
       if (!el) {
-        if (e.target.id==='modal-bg') { modalState=null; render(); }
+        if (e.target.id==='modal-bg') { modalState=null; pendingPhoto=undefined; render(); }
         return;
       }
       const action = el.dataset.action;
@@ -364,12 +429,15 @@
       if (action==='select') {
         selectedId = id||null; render();
       } else if (action==='add-vehicle') {
-        modalState={type:'vehicle',target:null}; render();
+        pendingPhoto=undefined; modalState={type:'vehicle',target:null}; render();
       } else if (action==='edit-vehicle') {
-        modalState={type:'vehicle',target:data.vehicles.find(v=>v.id===id)||null}; render();
+        pendingPhoto=undefined; modalState={type:'vehicle',target:data.vehicles.find(v=>v.id===id)||null}; render();
+      } else if (action==='remove-photo') {
+        pendingPhoto=null; render();
       } else if (action==='del-vehicle') {
         if(!confirm('Delete this vehicle and all its service records?'))return;
         if(selectedId===id) selectedId=null;
+        const np={...photos}; delete np[id]; photos=np; savePhotos(photos);
         update({vehicles:data.vehicles.filter(v=>v.id!==id),records:data.records.filter(r=>r.vehicleId!==id)});
       } else if (action==='add-record') {
         modalState={type:'record',target:null}; render();
@@ -379,7 +447,7 @@
         if(!confirm('Delete this service record?'))return;
         update({...data,records:data.records.filter(r=>r.id!==id)});
       } else if (action==='close-modal') {
-        modalState=null; render();
+        modalState=null; pendingPhoto=undefined; render();
       } else if (action==='save-vehicle') {
         const name = document.getElementById('f-name').value.trim();
         if(!name){alert('Name is required.');return;}
@@ -392,13 +460,21 @@
           hours:document.getElementById('f-hours').value,
           notes:document.getElementById('f-notes').value,
         };
+        let targetId = modalState.target?.id;
         if(modalState.target) {
-          update({...data,vehicles:data.vehicles.map(v=>v.id===modalState.target.id?{...modalState.target,...form}:v)});
+          update({...data,vehicles:data.vehicles.map(v=>v.id===targetId?{...modalState.target,...form}:v)});
         } else {
           const nv={id:uid(),...form};
-          selectedId=nv.id;
+          targetId=nv.id; selectedId=nv.id;
           update({...data,vehicles:[...data.vehicles,nv]});
         }
+        // Save photo
+        if(pendingPhoto !== undefined) {
+          const np={...photos};
+          if(pendingPhoto===null){delete np[targetId];}else{np[targetId]=pendingPhoto;}
+          photos=np; savePhotos(photos);
+        }
+        pendingPhoto=undefined;
         modalState=null; render();
       } else if (action==='save-record') {
         const date=document.getElementById('f-date').value;
@@ -430,4 +506,3 @@
   </script>
 </body>
 </html>
-
