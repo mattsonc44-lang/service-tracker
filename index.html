@@ -140,6 +140,7 @@
 </head>
 <body>
   <div id="app"></div>
+  <input type="file" id="global-photo-input" accept="image/*" style="display:none" />
   <script>
     const ICONS = {Truck:"🚛",Tractor:"🚜",Combine:"🌾","Grain Cart":"⚙",Semi:"🚛",Trailer:"📦",Sprayer:"💧",Pickup:"🛻","ATV/UTV":"🏎",Generator:"⚡",Other:"🔧"};
     const SERVICE_TYPES = ["Oil Change","Filter Replacement","Tire Service","Brake Service","Hydraulic Service","Belt/Chain Replacement","Coolant Service","Fuel System","Battery/Electrical","Inspection","Repair","Other"];
@@ -324,17 +325,15 @@
                   const p = pendingPhoto !== undefined ? pendingPhoto : (v ? photos[v.id] : null);
                   if(p) return `<img class="photo-preview" src="${p}" alt="Preview" />
                     <div style="display:flex;gap:8px;margin-top:4px">
-                      <div class="photo-upload-area" style="flex:1;padding:10px">
-                        <input type="file" id="f-photo-input" accept="image/*" />
+                      <button class="photo-upload-area btn-ghost" style="flex:1;padding:10px;cursor:pointer;border:1px solid var(--border2)" data-action="pick-photo">
                         <span class="photo-upload-lbl">Change Photo</span>
-                      </div>
+                      </button>
                       <button class="photo-remove" data-action="remove-photo">Remove</button>
                     </div>`;
-                  return `<div class="photo-upload-area">
-                    <input type="file" id="f-photo-input" accept="image/*" />
+                  return `<button class="photo-upload-area" style="width:100%;cursor:pointer;background:none" data-action="pick-photo">
                     <div style="font-size:28px;margin-bottom:8px">📷</div>
                     <div class="photo-upload-lbl">Click to upload a photo</div>
-                  </div>`;
+                  </button>`;
                 })()}
               </div>
             </div>
@@ -419,6 +418,8 @@
         pendingPhoto=undefined; modalState={type:'vehicle',target:null}; render();
       } else if (action==='edit-vehicle') {
         pendingPhoto=undefined; modalState={type:'vehicle',target:data.vehicles.find(v=>v.id===id)||null}; render();
+      } else if (action==='pick-photo') {
+        document.getElementById('global-photo-input').click();
       } else if (action==='remove-photo') {
         pendingPhoto=null; render();
       } else if (action==='del-vehicle') {
@@ -490,6 +491,17 @@
     });
 
     render();
+
+    // Global photo input handler
+    document.getElementById('global-photo-input').addEventListener('change', function() {
+      if (!this.files || !this.files[0]) return;
+      var file = this.files[0];
+      compressImage(file, 800, 600, 0.78).then(function(compressed) {
+        pendingPhoto = compressed;
+        render();
+      });
+      this.value = ''; // reset so same file can be picked again
+    });
   </script>
 </body>
 </html>
