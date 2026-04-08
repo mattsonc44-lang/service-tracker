@@ -169,6 +169,30 @@
     .photo-preview { width:100%; height:160px; object-fit:cover; border-radius:4px; display:block; margin-bottom:8px; }
     .photo-upload-lbl { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); }
     .photo-remove { background:rgba(232,64,42,.15); color:var(--red); border:1px solid rgba(232,64,42,.3); border-radius:4px; padding:4px 10px; font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:700; cursor:pointer; margin-top:6px; }
+
+    @media print {
+      .topbar, .tab-bar, .sidebar, .report-bar, .report-clear, .no-print { display:none !important; }
+      body { background:#fff !important; color:#000 !important; }
+      .main { overflow:visible !important; }
+      .main-content { padding:0 !important; overflow:visible !important; }
+      .layout { display:block !important; }
+      .report-summary { margin-bottom:14px; }
+      .report-stat { background:#f5f5f5 !important; border:1px solid #ddd !important; }
+      .report-stat-val { color:#c47e0e !important; }
+      .report-stat-lbl { color:#666 !important; }
+      .report-table th { background:#f0f0f0 !important; color:#444 !important; border-bottom:2px solid #ccc !important; }
+      .report-table td { border-bottom:1px solid #eee !important; color:#222 !important; }
+      .report-table .td-vehicle { color:#000 !important; }
+      .report-table .td-type { color:#c47e0e !important; }
+      .report-table .td-part { color:#c47e0e !important; }
+      .report-table .td-cost { color:#2a7a4b !important; }
+      .report-table .td-notes { color:#555 !important; }
+      .print-header { display:block !important; }
+      @page { margin:1.5cm; }
+    }
+    .print-header { display:none; margin-bottom:16px; }
+    .print-header h1 { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:#000; }
+    .print-header p { font-size:12px; color:#555; margin-top:4px; }
     @media (max-width:640px) { .sidebar { width:200px; } .topbar-stats { display:none; } .sr { grid-template-columns:1fr auto; } .sr-date { display:none; } .form-row { grid-template-columns:1fr; } }
     @media (max-width:480px) { .sidebar { display:none; } .main-content { padding:16px; } }
   </style>
@@ -469,6 +493,12 @@
             <input id="rf-keyword" type="text" placeholder="Search all fields..." value="${esc(keyword)}" data-action="report-input" data-field="keyword" />
           </div>
           <button class="report-clear" data-action="report-clear">Clear</button>
+          <button class="report-clear no-print" data-action="report-print" style="background:var(--amber);color:#0d0f12;border-color:var(--amber)">🖨 Print</button>
+        </div>
+        <div class="print-header">
+          <h1>Mattson Bros — Service Report</h1>
+          <p>Generated ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}
+          ${year?' · Year: '+year:''}${make?' · Make: '+esc(make):''}${equipment?' · Equipment: '+esc(equipment):''}${partnum?' · Part #: '+esc(partnum):''}${keyword?' · Keyword: '+esc(keyword):''}</p>
         </div>
         <div class="report-summary">
           <div class="report-stat"><div class="report-stat-val">${results.length}</div><div class="report-stat-lbl">Records</div></div>
@@ -558,6 +588,8 @@
         appView='fleet'; render();
       } else if (action==='tab-report') {
         appView='report'; render();
+      } else if (action==='report-print') {
+        window.print();
       } else if (action==='report-clear') {
         reportFilters={year:'',equipment:'',partnum:'',make:'',keyword:''}; render();
       } else if (action==='report-filter') {
