@@ -41,6 +41,11 @@
     .si-count { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--text-dim); background:var(--bg3); padding:1px 6px; border-radius:10px; flex-shrink:0; }
     .si.active .si-count { background:rgba(245,166,35,.15); color:var(--amber); }
     .sidebar-div { height:1px; background:var(--border); margin:6px 0; }
+    .sidebar-search { padding:8px 10px; flex-shrink:0; border-bottom:1px solid var(--border); }
+    .sidebar-search input { width:100%; background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:6px 10px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; }
+    .sidebar-search input:focus { border-color:var(--amber); }
+    .sidebar-search input::placeholder { color:var(--text-dim); }
+    .sr-part { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--amber); background:rgba(245,166,35,.08); padding:2px 7px; border-radius:3px; border:1px solid rgba(245,166,35,.2); }
     .sidebar-add { margin:8px 10px 10px; padding:8px; border:1px dashed var(--border2); border-radius:4px; background:none; color:var(--text-dim); font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; transition:border-color .15s,color .15s; flex-shrink:0; }
     .sidebar-add:hover { border-color:var(--amber); color:var(--amber); }
     .main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
@@ -183,24 +188,31 @@
     let selectedId = null;
     let modalState = null;
     let pendingPhoto = undefined;
+    let sidebarSearch = '';
 
     function update(next) { data=next; saveData(next); render(); }
 
     function renderSidebar() {
       const counts = {};
       data.records.forEach(r=>{ counts[r.vehicleId]=(counts[r.vehicleId]||0)+1; });
+      const filtered = sidebarSearch
+        ? data.vehicles.filter(v => (v.name+v.make+v.model+v.type).toLowerCase().includes(sidebarSearch.toLowerCase()))
+        : data.vehicles;
       return `<div class="sidebar">
         <div class="sidebar-hdr">
           <span class="sidebar-lbl">Fleet</span>
           <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)">${data.vehicles.length}</span>
         </div>
+        <div class="sidebar-search">
+          <input id="sidebar-search-input" type="text" placeholder="Search fleet..." value="${esc(sidebarSearch)}" data-action="sidebar-search" />
+        </div>
         <div class="sidebar-list">
-          <div class="si${!selectedId?' active':''}" data-action="select" data-id="">
+          ${!sidebarSearch ? `<div class="si${!selectedId?' active':''}" data-action="select" data-id="">
             <span class="si-icon">🗂</span>
             <div class="si-info"><div class="si-name">All Equipment</div><div class="si-sub">Fleet overview</div></div>
           </div>
-          <div class="sidebar-div"></div>
-          ${data.vehicles.map(v=>`
+          <div class="sidebar-div"></div>` : ''}
+          ${filtered.map(v=>`
             <div class="si${selectedId===v.id?' active':''}" data-action="select" data-id="${esc(v.id)}">
               ${photos[v.id]
                 ? `<img class="si-thumb" src="${photos[v.id]}" alt="" />`
@@ -272,6 +284,7 @@
                 <div class="sr-tags">
                   ${r.tech?`<span class="sr-tag">👤 ${esc(r.tech)}</span>`:''}
                   ${r.hours?`<span class="sr-tag">⏱ ${Number(r.hours).toLocaleString()} hrs/mi</span>`:''}
+                  ${r.partnum?`<span class="sr-part">🔩 ${esc(r.partnum)}</span>`:''}
                 </div>
               </div>
               <div class="sr-right">
@@ -360,7 +373,8 @@
               <div class="form-group"><label class="form-lbl">Service Type *</label><select id="f-type" class="form-select">${SERVICE_TYPES.map(t=>`<option value="${t}"${(r?.type||'Oil Change')===t?' selected':''}>${t}</option>`).join('')}</select></div>
               <div class="form-group"><label class="form-lbl">Cost ($)</label><input id="f-cost" type="number" class="form-input" value="${esc(r?.cost||'')}" placeholder="0.00" /></div>
               <div class="form-group"><label class="form-lbl">Hours / Miles at Service</label><input id="f-hours" type="number" class="form-input" value="${esc(r?.hours||'')}" placeholder="0" /></div>
-              <div class="form-group form-full"><label class="form-lbl">Performed By</label><input id="f-tech" class="form-input" value="${esc(r?.tech||'')}" placeholder="Self, Dealer, Shop..." /></div>
+              <div class="form-group"><label class="form-lbl">Performed By</label><input id="f-tech" class="form-input" value="${esc(r?.tech||'')}" placeholder="Self, Dealer, Shop..." /></div>
+              <div class="form-group"><label class="form-lbl">Part #</label><input id="f-partnum" class="form-input" value="${esc(r?.partnum||'')}" placeholder="Part number..." /></div>
               <div class="form-group form-full"><label class="form-lbl">Notes / Parts Used</label><textarea id="f-notes" class="form-textarea" placeholder="Work done, parts replaced...">${esc(r?.notes||'')}</textarea></div>
             </div>
           </div>
@@ -404,6 +418,8 @@
     }
 
     document.getElementById('app').addEventListener('click', function(e) {
+      // Handle search input live typing
+      if (e.target.id === 'sidebar-search-input') return;
       const el = e.target.closest('[data-action]');
       if (!el) {
         if (e.target.id==='modal-bg') { modalState=null; pendingPhoto=undefined; render(); }
@@ -412,7 +428,9 @@
       const action = el.dataset.action;
       const id = el.dataset.id;
 
-      if (action==='select') {
+      if (action==='sidebar-search') {
+        // handled by input event
+      } else if (action==='select') {
         selectedId = id||null; render();
       } else if (action==='add-vehicle') {
         pendingPhoto=undefined; modalState={type:'vehicle',target:null}; render();
@@ -468,10 +486,12 @@
         const date=document.getElementById('f-date').value;
         const type=document.getElementById('f-type').value;
         if(!date||!type){alert('Date and type are required.');return;}
+        const partnumEl = document.getElementById('f-partnum');
         const form={date,type,
           cost:document.getElementById('f-cost').value,
           hours:document.getElementById('f-hours').value,
           tech:document.getElementById('f-tech').value,
+          partnum:partnumEl ? partnumEl.value : '',
           notes:document.getElementById('f-notes').value,
         };
         let vehicles=data.vehicles;
@@ -491,6 +511,17 @@
     });
 
     render();
+
+    // Sidebar search - use delegated input event on app
+    document.getElementById('app').addEventListener('input', function(e) {
+      if (e.target.id === 'sidebar-search-input') {
+        sidebarSearch = e.target.value;
+        render();
+        // Restore focus and cursor position
+        const inp = document.getElementById('sidebar-search-input');
+        if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+      }
+    });
 
     // Global photo input handler
     document.getElementById('global-photo-input').addEventListener('change', function() {
