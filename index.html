@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ServiceLog — Fleet Maintenance Tracker</title>
+  <title>ServiceLog â€” Fleet Maintenance Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
   <style>
@@ -125,7 +125,7 @@
 <body>
   <div id="app"></div>
   <script>
-    const ICONS = {Truck:"🚛",Tractor:"🚜",Combine:"🌾","Grain Cart":"⚙",Semi:"🚛",Trailer:"📦",Sprayer:"💧",Pickup:"🛻","ATV/UTV":"🏎",Generator:"⚡",Other:"🔧"};
+    const ICONS = {Truck:"ðŸš›",Tractor:"ðŸšœ",Combine:"ðŸŒ¾","Grain Cart":"âš™",Semi:"ðŸš›",Trailer:"ðŸ“¦",Sprayer:"ðŸ’§",Pickup:"ðŸ›»","ATV/UTV":"ðŸŽ",Generator:"âš¡",Other:"ðŸ”§"};
     const SERVICE_TYPES = ["Oil Change","Filter Replacement","Tire Service","Brake Service","Hydraulic Service","Belt/Chain Replacement","Coolant Service","Fuel System","Battery/Electrical","Inspection","Repair","Other"];
     const EQUIPMENT_TYPES = ["Truck","Tractor","Combine","Grain Cart","Semi","Trailer","Sprayer","Pickup","ATV/UTV","Generator","Other"];
     const STORAGE_KEY = "svc_tracker_v1";
@@ -170,21 +170,21 @@
         </div>
         <div class="sidebar-list">
           <div class="si${!selectedId?' active':''}" data-action="select" data-id="">
-            <span class="si-icon">🗂</span>
+            <span class="si-icon">ðŸ—‚</span>
             <div class="si-info"><div class="si-name">All Equipment</div><div class="si-sub">Fleet overview</div></div>
           </div>
           <div class="sidebar-div"></div>
           ${data.vehicles.map(v=>`
             <div class="si${selectedId===v.id?' active':''}" data-action="select" data-id="${esc(v.id)}">
-              <span class="si-icon">${ICONS[v.type]||'🔧'}</span>
+              <span class="si-icon">${ICONS[v.type]||'ðŸ”§'}</span>
               <div class="si-info">
                 <div class="si-name">${esc(v.name)}</div>
-                <div class="si-sub">${esc(v.type)}${v.year?' · '+esc(v.year):''}</div>
+                <div class="si-sub">${esc(v.type)}${v.year?' Â· '+esc(v.year):''}</div>
               </div>
               ${counts[v.id]?`<span class="si-count">${counts[v.id]}</span>`:''}
             </div>`).join('')}
         </div>
-        <button class="sidebar-add" data-action="add-vehicle">＋ Add Equipment</button>
+        <button class="sidebar-add" data-action="add-vehicle">ï¼‹ Add Equipment</button>
       </div>`;
     }
 
@@ -203,13 +203,13 @@
             return `<div class="vehicle-card" data-action="select" data-id="${esc(v.id)}">
               <div class="vc-type">${ICONS[v.type]||''} ${esc(v.type)}</div>
               <div class="vc-name">${esc(v.name)}</div>
-              <div class="vc-sub">${esc([v.year,v.make,v.model].filter(Boolean).join(' · '))}</div>
+              <div class="vc-sub">${esc([v.year,v.make,v.model].filter(Boolean).join(' Â· '))}</div>
               <div class="vc-meta">
                 <div class="vc-stat"><div class="vc-stat-lbl">Records</div><div class="vc-stat-val">${recs.length}</div></div>
                 <div class="vc-stat"><div class="vc-stat-lbl">Cost</div><div class="vc-stat-val">$${sumCost(recs).toLocaleString()}</div></div>
                 ${v.hours?`<div class="vc-stat"><div class="vc-stat-lbl">Hrs/Mi</div><div class="vc-stat-val">${Number(v.hours).toLocaleString()}</div></div>`:''}
               </div>
-              ${recs[0]?`<div class="vc-last">Last: ${esc(recs[0].type)} — ${esc(recs[0].date)}</div>`:''}
+              ${recs[0]?`<div class="vc-last">Last: ${esc(recs[0].type)} â€” ${esc(recs[0].date)}</div>`:''}
             </div>`;
           }).join('')}
         </div>`;
@@ -229,7 +229,7 @@
       ].filter(Boolean).join('');
 
       const rows = recs.length===0
-        ? `<div class="empty"><div class="empty-icon">🔧</div><div class="empty-title">No Service Records</div><div style="font-size:14px">Hit "+ Log Service" to add the first entry.</div></div>`
+        ? `<div class="empty"><div class="empty-icon">ðŸ”§</div><div class="empty-title">No Service Records</div><div style="font-size:14px">Hit "+ Log Service" to add the first entry.</div></div>`
         : `<div class="service-list">${recs.map(r=>{
             const d=fmtDate(r.date);
             return `<div class="sr">
@@ -238,14 +238,14 @@
                 <div class="sr-type">${esc(r.type)}</div>
                 ${r.notes?`<div class="sr-notes">${esc(r.notes)}</div>`:''}
                 <div class="sr-tags">
-                  ${r.tech?`<span class="sr-tag">👤 ${esc(r.tech)}</span>`:''}
-                  ${r.hours?`<span class="sr-tag">⏱ ${Number(r.hours).toLocaleString()} hrs/mi</span>`:''}
+                  ${r.tech?`<span class="sr-tag">ðŸ‘¤ ${esc(r.tech)}</span>`:''}
+                  ${r.hours?`<span class="sr-tag">â± ${Number(r.hours).toLocaleString()} hrs/mi</span>`:''}
                 </div>
               </div>
               <div class="sr-right">
-                <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
+                <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'â€”'}</div>
                 <button class="btn btn-ghost btn-sm" data-action="edit-record" data-id="${esc(r.id)}">Edit</button>
-                <button class="btn btn-danger btn-sm" data-action="del-record" data-id="${esc(r.id)}">✕</button>
+                <button class="btn btn-danger btn-sm" data-action="del-record" data-id="${esc(r.id)}">âœ•</button>
               </div>
             </div>`;
           }).join('')}</div>`;
@@ -254,7 +254,7 @@
         <div class="vic">
           <div class="vic-top">
             <div class="vic-identity">
-              <div class="vic-icon-wrap">${ICONS[v.type]||'🔧'}</div>
+              <div class="vic-icon-wrap">${ICONS[v.type]||'ðŸ”§'}</div>
               <div><div class="vic-vname">${esc(v.name)}</div><span class="vic-badge">${esc(v.type)}</span></div>
             </div>
             <div class="vic-actions">
@@ -263,7 +263,7 @@
             </div>
           </div>
           <div class="vic-specs">${specs}</div>
-          ${v.notes?`<div class="vic-notes">📝 ${esc(v.notes)}</div>`:''}
+          ${v.notes?`<div class="vic-notes">ðŸ“ ${esc(v.notes)}</div>`:''}
         </div>
         ${rows}`;
     }
@@ -273,7 +273,7 @@
         <div class="modal">
           <div class="modal-hdr">
             <div class="modal-title">${v?'Edit Equipment':'Add Equipment'}</div>
-            <button class="modal-close" data-action="close-modal">✕</button>
+            <button class="modal-close" data-action="close-modal">âœ•</button>
           </div>
           <div class="modal-body">
             <div class="form-row">
@@ -301,7 +301,7 @@
         <div class="modal">
           <div class="modal-hdr">
             <div class="modal-title">${r?'Edit Service Record':'Log Service'}</div>
-            <button class="modal-close" data-action="close-modal">✕</button>
+            <button class="modal-close" data-action="close-modal">âœ•</button>
           </div>
           <div class="modal-body">
             <div class="form-row">
@@ -335,7 +335,7 @@
       document.getElementById('app').innerHTML = `
         <div class="topbar">
           <div class="topbar-brand">
-            <div class="topbar-eyebrow">⚙ Fleet</div>
+            <div class="topbar-eyebrow">âš™ Fleet</div>
             <div class="topbar-title">SERVICE<span>LOG</span></div>
           </div>
           <div class="topbar-stats">
@@ -430,3 +430,4 @@
   </script>
 </body>
 </html>
+
