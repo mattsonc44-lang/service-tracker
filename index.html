@@ -787,7 +787,7 @@
       } else if (action==='report-clear') {
         reportFilters={year:'',equipment:'',partnum:'',make:'',keyword:'',customer:''}; render();
       } else if (action==='report-filter') {
-        reportFilters[el.dataset.field] = el.value; render();
+        // handled by change event
       } else if (action==='select-from-report') {
         appView='fleet'; selectedId=id; render();
       } else if (action==='sidebar-search') {
@@ -876,6 +876,16 @@
     render();
 
     // Sidebar search - use delegated input event on app
+    document.getElementById('app').addEventListener('change', function(e) {
+      if (e.target.dataset.action === 'report-filter') {
+        reportFilters[e.target.dataset.field] = e.target.value;
+        render();
+        // Re-select the correct option after render
+        const sel = document.querySelector('[data-field="'+e.target.dataset.field+'"]');
+        if (sel) sel.value = reportFilters[e.target.dataset.field];
+      }
+    });
+
     document.getElementById('app').addEventListener('input', function(e) {
       if (e.target.dataset.action === 'report-input') {
         reportFilters[e.target.dataset.field] = e.target.value;
