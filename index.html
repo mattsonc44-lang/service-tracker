@@ -311,7 +311,7 @@
             <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)">${customers.length}</span>
           </div>
           <div class="sidebar-list">
-            ${customers.map(c=>`
+            ${[...customers].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`
               <div class="si" data-action="select-customer" data-id="${esc(c.id)}">
                 <span class="si-icon">🏢</span>
                 <div class="si-info">
@@ -383,7 +383,7 @@
             <div class="summary-stat"><div class="summary-stat-val">$${sumCost(data.records).toLocaleString()}</div><div class="summary-stat-lbl">Total Spent</div></div>
           </div>
           <div class="fleet-grid">
-            ${customers.map(c=>{
+            ${[...customers].sort((a,b)=>a.name.localeCompare(b.name)).map(c=>{
               const cvs = data.vehicles.filter(v=>v.customerId===c.id);
               const crecs = data.records.filter(r=>cvs.some(v=>v.id===r.vehicleId));
               return `<div class="vehicle-card" data-action="select-customer" data-id="${esc(c.id)}" style="cursor:pointer">
