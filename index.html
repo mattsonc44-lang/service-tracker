@@ -283,6 +283,16 @@
     let appView = 'fleet'; // fleet | report
     let reportFilters = {year:'', equipment:'', partnum:'', make:'', keyword:'', customer:''};
 
+
+    // Split "notes | Parts: xxx" into {notes, parts}
+    function splitNotesParts(r) {
+      if (r.partnum) return {notes: r.notes||'', parts: r.partnum};
+      const raw = r.notes || '';
+      const idx = raw.indexOf(' | Parts:');
+      if (idx === -1) return {notes: raw, parts: ''};
+      return {notes: raw.slice(0, idx).trim(), parts: raw.slice(idx + 9).trim()};
+    }
+
     function update(next) { data=next; saveData(next); render(); }
 
     function renderSidebar() {
@@ -450,17 +460,19 @@
             const d=fmtDate(r.date);
             return `<div class="sr">
               <div class="sr-date"><div class="sr-day">${d.day}</div><div class="sr-mon">${d.mon}</div><div class="sr-yr">${d.yr}</div></div>
-              <div>
-                <div class="sr-type">${esc(r.type)}</div>
-                ${r.notes?`<div class="sr-notes">${esc(r.notes)}</div>`:''}
-                <div class="sr-tags">
-                  ${r.tech?`<span class="sr-tag">👤 ${esc(r.tech)}</span>`:''}
-                  ${r.hours?`<span class="sr-tag">⏱ ${Number(r.hours).toLocaleString()} hrs/mi</span>`:''}
-                </div>
-              </div>
-              <div class="sr-partcol">
-                ${r.partnum?`<div class="sr-partcol-lbl">Part #</div><div class="sr-partcol-val">${esc(r.partnum)}</div>`:''}
-              </div>
+              ${(()=>{ const sp=splitNotesParts(r); return (
+                '<div>' +
+                  '<div class="sr-type">'+esc(r.type)+'</div>' +
+                  (sp.notes?'<div class="sr-notes">'+esc(sp.notes)+'</div>':'') +
+                  '<div class="sr-tags">' +
+                    (r.tech?'<span class="sr-tag">👤 '+esc(r.tech)+'</span>':'') +
+                    (r.hours?'<span class="sr-tag">⏱ '+Number(r.hours).toLocaleString()+' hrs/mi</span>':'') +
+                  '</div>' +
+                '</div>' +
+                '<div class="sr-partcol">' +
+                  (sp.parts?'<div class="sr-partcol-lbl">Part #</div><div class="sr-partcol-val">'+esc(sp.parts)+'</div>':'') +
+                '</div>'
+              ); })()}
               <div class="sr-right">
                 <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
                 <button class="btn btn-ghost btn-sm" data-action="edit-record" data-id="${esc(r.id)}">Edit</button>
@@ -673,8 +685,7 @@
               <td class="td-date">${r.date||''}</td>
               <td class="td-vehicle" data-action="select-from-report" data-id="${esc(r.vehicleId)}">${esc(r._v.name)}</td>
               <td class="td-type">${esc(r.type)}</td>
-              <td class="td-notes">${esc((r.notes||'').slice(0,120))}</td>
-              <td class="td-part">${r.partnum?esc(r.partnum):''}</td>
+              ${(()=>{ const sp=splitNotesParts(r); return '<td class="td-notes">'+esc(sp.notes.slice(0,120))+'</td><td class="td-part">'+esc(sp.parts.slice(0,80))+'</td>'; })()}
               <td style="font-size:12px;color:var(--text-dim)">${esc(r.tech||'')}</td>
               <td class="td-cost">${r.cost?'$'+Number(r.cost).toLocaleString():''}</td>
             </tr>`).join('')}
