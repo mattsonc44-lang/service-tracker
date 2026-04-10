@@ -135,6 +135,8 @@
     .cust-item.active .cust-count { background:rgba(245,166,35,.15); color:var(--amber); }
     .sidebar-section-hdr { padding:6px 14px 4px; font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); margin-top:4px; }
     .cust-modal-actions { display:flex; gap:8px; }
+    .back-cust-btn { background:none; border:none; color:var(--amber); font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:700; cursor:pointer; padding:0; letter-spacing:0.5px; transition:color .15s; }
+    .back-cust-btn:hover { color:#f0b84e; }
     /* REPORT */
     .report-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
     .report-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:140px; }
@@ -281,18 +283,53 @@
     function update(next) { data=next; saveData(next); render(); }
 
     function renderSidebar() {
+      const customers = data.customers || [];
+      const selCust = customers.find(c=>c.id===selectedCustomerId) || null;
       const counts = {};
       data.records.forEach(r=>{ counts[r.vehicleId]=(counts[r.vehicleId]||0)+1; });
+
+      // ── LEVEL 1: Customer list ──────────────────────────────────────────
+      if (!selCust) {
+        const custCounts = {};
+        data.vehicles.forEach(v=>{ custCounts[v.customerId]=(custCounts[v.customerId]||0)+1; });
+        return `<div class="sidebar">
+          <div class="sidebar-hdr">
+            <span class="sidebar-lbl">Customers</span>
+            <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)">${customers.length}</span>
+          </div>
+          <div class="sidebar-list">
+            ${customers.map(c=>`
+              <div class="si" data-action="select-customer" data-id="${esc(c.id)}">
+                <span class="si-icon">🏢</span>
+                <div class="si-info">
+                  <div class="si-name">${esc(c.name)}</div>
+                  <div class="si-sub">${custCounts[c.id]||0} equipment</div>
+                </div>
+                <span class="si-count" style="margin-right:4px">›</span>
+              </div>`).join('')}
+          </div>
+          <button class="sidebar-add" data-action="add-customer">＋ Add Customer</button>
+        </div>`;
+      }
+
+      // ── LEVEL 2: Equipment list for selected customer ───────────────────
+      const custVehicles = data.vehicles.filter(v=>v.customerId===selCust.id);
       const filtered = sidebarSearch
-        ? data.vehicles.filter(v => (v.name+v.make+v.model+v.type).toLowerCase().includes(sidebarSearch.toLowerCase()))
-        : data.vehicles;
+        ? custVehicles.filter(v=>(v.name+v.make+v.model+v.type).toLowerCase().includes(sidebarSearch.toLowerCase()))
+        : custVehicles;
+
       return `<div class="sidebar">
-        <div class="sidebar-hdr">
-          <span class="sidebar-lbl">Fleet</span>
-          <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)">${data.vehicles.length}</span>
+        <div class="sidebar-hdr" style="flex-direction:column;align-items:flex-start;gap:6px">
+          <button class="back-cust-btn" data-action="back-to-customers">‹ Customers</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+            <span class="sidebar-lbl">${esc(selCust.name)}</span>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:11px" data-action="edit-customer" data-id="${esc(selCust.id)}">Edit</button>
+            </div>
+          </div>
         </div>
         <div class="sidebar-search">
-          <input id="sidebar-search-input" type="text" placeholder="Search fleet..." value="${esc(sidebarSearch)}" data-action="sidebar-search" />
+          <input id="sidebar-search-input" type="text" placeholder="Search equipment..." value="${esc(sidebarSearch)}" data-action="sidebar-search" />
         </div>
         <div class="sidebar-list">
           ${!sidebarSearch ? `<div class="si${!selectedId?' active':''}" data-action="select" data-id="">
@@ -320,13 +357,13 @@
       const customers = data.customers || [];
       const selCust = customers.find(c=>c.id===selectedCustomerId);
 
-      // No customer selected — show customer picker
+      // No customer selected — show customer cards
       if (!selCust) {
         const custCounts = {};
         data.vehicles.forEach(v=>{ custCounts[v.customerId]=(custCounts[v.customerId]||0)+1; });
         return `
-          <div class="overview-title">Select a Customer</div>
-          <div class="overview-sub">Choose a customer from the sidebar to view their fleet.</div>
+          <div class="overview-title">Customers</div>
+          <div class="overview-sub">Select a customer from the sidebar to view their fleet.</div>
           <div class="summary-bar">
             <div class="summary-stat"><div class="summary-stat-val">${customers.length}</div><div class="summary-stat-lbl">Customers</div></div>
             <div class="summary-stat"><div class="summary-stat-val">${data.vehicles.length}</div><div class="summary-stat-lbl">Total Equipment</div></div>
@@ -694,7 +731,9 @@
       const action = el.dataset.action;
       const id = el.dataset.id;
 
-      if (action==='select-customer') {
+      if (action==='back-to-customers') {
+        selectedCustomerId=null; selectedId=null; sidebarSearch=''; render();
+      } else if (action==='select-customer') {
         selectedCustomerId=id; selectedId=null; sidebarSearch=''; render();
       } else if (action==='add-customer') {
         modalState={type:'customer',target:null}; render();
