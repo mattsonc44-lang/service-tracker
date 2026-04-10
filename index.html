@@ -83,7 +83,7 @@
     .vic-spec-val { font-size:14px; font-weight:600; color:var(--text-bright); font-family:'Rajdhani',sans-serif; }
     .vic-notes { padding:10px 18px; font-size:13px; color:var(--text-dim); font-style:italic; border-top:1px solid var(--border); }
     .service-list { display:flex; flex-direction:column; gap:10px; }
-    .sr { background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--amber-dim); border-radius:4px; padding:14px 18px; display:grid; grid-template-columns:56px 1fr auto; gap:14px; align-items:start; transition:border-color .15s; }
+    .sr { background:var(--panel); border:1px solid var(--border); border-left:3px solid var(--amber-dim); border-radius:4px; padding:14px 18px; display:grid; grid-template-columns:56px 1fr minmax(120px,180px) auto; gap:14px; align-items:start; transition:border-color .15s; }
     .sr:hover { border-left-color:var(--amber); }
     .sr-date { text-align:center; }
     .sr-day { font-family:'Rajdhani',sans-serif; font-size:24px; font-weight:700; color:var(--amber); line-height:1; }
@@ -91,6 +91,9 @@
     .sr-yr { font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--text-dim); }
     .sr-type { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--text-bright); margin-bottom:3px; }
     .sr-notes { font-size:13px; color:var(--text-dim); line-height:1.4; margin-bottom:6px; }
+    .sr-partcol { display:flex; flex-direction:column; gap:4px; padding-top:2px; }
+    .sr-partcol-lbl { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:2px; }
+    .sr-partcol-val { font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--amber); word-break:break-word; line-height:1.4; }
     .sr-tags { display:flex; gap:6px; flex-wrap:wrap; }
     .sr-tag { font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--text-dim); background:var(--bg3); padding:2px 7px; border-radius:3px; }
     .sr-right { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
@@ -207,7 +210,7 @@
     .print-header { display:none; margin-bottom:16px; }
     .print-header h1 { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:#000; }
     .print-header p { font-size:12px; color:#555; margin-top:4px; }
-    @media (max-width:640px) { .sidebar { width:200px; } .topbar-stats { display:none; } .sr { grid-template-columns:1fr auto; } .sr-date { display:none; } .form-row { grid-template-columns:1fr; } }
+    @media (max-width:640px) { .sidebar { width:200px; } .topbar-stats { display:none; } .sr { grid-template-columns:1fr auto; } .sr-date { display:none; } .sr-partcol { display:none; } .form-row { grid-template-columns:1fr; } }
     @media (max-width:480px) { .sidebar { display:none; } .main-content { padding:16px; } }
   </style>
 </head>
@@ -453,8 +456,10 @@
                 <div class="sr-tags">
                   ${r.tech?`<span class="sr-tag">👤 ${esc(r.tech)}</span>`:''}
                   ${r.hours?`<span class="sr-tag">⏱ ${Number(r.hours).toLocaleString()} hrs/mi</span>`:''}
-                  ${r.partnum?`<span class="sr-part">🔩 ${esc(r.partnum)}</span>`:''}
                 </div>
+              </div>
+              <div class="sr-partcol">
+                ${r.partnum?`<div class="sr-partcol-lbl">Part #</div><div class="sr-partcol-val">${esc(r.partnum)}</div>`:''}
               </div>
               <div class="sr-right">
                 <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
