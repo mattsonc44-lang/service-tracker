@@ -187,6 +187,19 @@
     .photo-upload-lbl { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); }
     .photo-remove { background:rgba(232,64,42,.15); color:var(--red); border:1px solid rgba(232,64,42,.3); border-radius:4px; padding:4px 10px; font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:700; cursor:pointer; margin-top:6px; }
 
+
+    .sync-dot { width:8px; height:8px; border-radius:50%; background:#16a34a; display:inline-block; margin-left:8px; flex-shrink:0; }
+    .sync-dot.syncing { background:#d97706; animation:pulse 1s infinite; }
+    .sync-dot.error { background:#dc2626; }
+    .sync-dot.offline { background:#9ca3af; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .sync-label { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; color:var(--text-dim); }
+    .loading-screen { position:fixed; inset:0; background:#f0f2f5; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; z-index:999; }
+    .loading-screen .logo { font-family:'Rajdhani',sans-serif; font-size:32px; font-weight:700; color:#111827; }
+    .loading-screen .logo span { color:#d97706; }
+    .loading-spinner { width:32px; height:32px; border:3px solid #d1d5db; border-top-color:#d97706; border-radius:50%; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-sub { font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:2px; color:#6b7280; text-transform:uppercase; }
     @media print {
       .topbar, .tab-bar, .sidebar, .report-bar, .report-clear, .no-print { display:none !important; }
       body { background:#fff !important; color:#000 !important; }
@@ -215,6 +228,8 @@
   </style>
 </head>
 <body>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
   <div id="app"></div>
   <input type="file" id="global-photo-input" accept="image/*" style="display:none" />
   <script>
@@ -231,8 +246,44 @@
       return {day:d.getDate().toString().padStart(2,'0'), mon:d.toLocaleString('en',{month:'short'}).toUpperCase(), yr:d.getFullYear()};
     }
     function sumCost(recs) { return recs.reduce((s,r)=>s+(parseFloat(r.cost)||0),0); }
+    // ── Firebase config ──────────────────────────────────────────────────
+    const firebaseConfig = {
+      apiKey: "AIzaSyA_p_PeIvIoSyq1WXzx2xyIz9Cqm7eodBs",
+      authDomain: "mattson-service-log.firebaseapp.com",
+      databaseURL: "https://mattson-service-log-default-rtdb.firebaseio.com",
+      projectId: "mattson-service-log",
+      storageBucket: "mattson-service-log.firebasestorage.app",
+      messagingSenderId: "748871166062",
+      appId: "1:748871166062:web:e5522999bbacaeeaf05e7f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const DB_PATH = 'servicelog';
+    let fbInitialized = false;
+    let syncStatus = 'loading'; // loading | synced | syncing | error | offline
+
     function loadData() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY))||null; } catch { return null; } }
-    function saveData(d) { localStorage.setItem(STORAGE_KEY,JSON.stringify(d)); }
+
+    function saveData(d) {
+      // Always save to localStorage as backup
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
+      // Save to Firebase
+      syncStatus = 'syncing'; updateSyncDot();
+      db.ref(DB_PATH).set(d)
+        .then(() => { syncStatus='synced'; updateSyncDot(); })
+        .catch(() => { syncStatus='error'; updateSyncDot(); });
+    }
+
+    function updateSyncDot() {
+      const dot = document.getElementById('sync-dot');
+      const lbl = document.getElementById('sync-label');
+      if (!dot) return;
+      dot.className = 'sync-dot';
+      if (syncStatus==='syncing') { dot.classList.add('syncing'); if(lbl) lbl.textContent='Saving...'; }
+      else if (syncStatus==='synced') { if(lbl) lbl.textContent='Synced'; }
+      else if (syncStatus==='error') { dot.classList.add('error'); if(lbl) lbl.textContent='Save failed'; }
+      else if (syncStatus==='offline') { dot.classList.add('offline'); if(lbl) lbl.textContent='Offline'; }
+    }
     // Migrate old separate photo store into vehicle objects
     function migrateCustomers(d) {
       // Add default customer if none exist
@@ -274,7 +325,12 @@
       });
     }
 
-    let data = (()=>{ const d=loadData(); if(!d||!d.vehicles?.length){saveData(SEED);return SEED;} return migrateCustomers(migratePhotos(d)); })();
+    // Start with localStorage while Firebase loads
+    let data = (()=>{
+      const d = loadData();
+      if(!d||!d.vehicles?.length){ localStorage.setItem(STORAGE_KEY,JSON.stringify(SEED)); return SEED; }
+      return migrateCustomers(migratePhotos(d));
+    })();
     let selectedCustomerId = null;
     let selectedId = null;
     let modalState = null;
@@ -715,6 +771,7 @@
           <div class="topbar-brand">
             <div class="topbar-eyebrow">⚙ Fleet</div>
             <div class="topbar-title">SERVICE<span>LOG</span></div>
+            <div style="display:flex;align-items:center;gap:5px;margin-left:8px"><div id="sync-dot" class="sync-dot syncing"></div><span id="sync-label" class="sync-label">Connecting...</span></div>
           </div>
           <div class="topbar-stats">
             <div class="ts-item"><div class="ts-val">${(data.customers||[]).length}</div><div class="ts-lbl">Customers</div></div>
@@ -874,6 +931,61 @@
     });
 
     render();
+
+    // ── Firebase real-time sync ───────────────────────────────────────────
+    // Show loading screen while Firebase connects
+    document.getElementById('app').insertAdjacentHTML('beforebegin',
+      '<div id="loading-screen" class="loading-screen">' +
+        '<div class="logo">SERVICE<span>LOG</span></div>' +
+        '<div class="loading-spinner"></div>' +
+        '<div class="loading-sub">Connecting to database...</div>' +
+      '</div>'
+    );
+
+    db.ref(DB_PATH).once('value')
+      .then(function(snapshot) {
+        const fbData = snapshot.val();
+        if (fbData && fbData.vehicles && fbData.vehicles.length > 0) {
+          // Firebase has data — use it and update localStorage
+          data = migrateCustomers(migratePhotos(fbData));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } else {
+          // Firebase is empty — push our local data up
+          db.ref(DB_PATH).set(data);
+        }
+        fbInitialized = true;
+        syncStatus = 'synced';
+        const ls = document.getElementById('loading-screen');
+        if (ls) ls.remove();
+        render();
+        updateSyncDot();
+
+        // Listen for changes from other devices
+        db.ref(DB_PATH).on('value', function(snap) {
+          if (!fbInitialized) return;
+          const remote = snap.val();
+          if (!remote) return;
+          // Only update if data actually changed (avoid echo from our own saves)
+          const remoteStr = JSON.stringify(remote);
+          const localStr = JSON.stringify(data);
+          if (remoteStr !== localStr) {
+            data = remote;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            render();
+          }
+          syncStatus = 'synced';
+          updateSyncDot();
+        });
+      })
+      .catch(function() {
+        // Offline or error — use localStorage
+        fbInitialized = true;
+        syncStatus = 'offline';
+        const ls = document.getElementById('loading-screen');
+        if (ls) ls.remove();
+        render();
+        updateSyncDot();
+      });
 
     // Sidebar search - use delegated input event on app
     document.getElementById('app').addEventListener('change', function(e) {
