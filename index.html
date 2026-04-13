@@ -698,14 +698,7 @@
             <div class="form-group"><label class="form-lbl">Customer</label><input class="form-input" value="${esc(cust?.name||'')}" disabled /></div>
             <div style="margin:12px 0 6px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)">Service Records (${records.length})</div>
             <div style="border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:12px">
-              ${records.map(r=>{ const vname=(data.vehicles.find(v=>v.id===r.vehicleId)||{}).name||''; return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px">
-                <div>
-                  <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px">${esc(r.type)} <span style="font-size:11px;color:var(--text-dim)">· ${esc(r.date)}</span></div>
-                  ${vname?'<div style="font-size:11px;color:var(--amber-dim);font-family:\'Share Tech Mono\',monospace;margin-bottom:2px">🚜 '+esc(vname)+'</div>':''}
-                  ${r.notes?'<div style="font-size:12px;color:var(--text-dim)">'+esc(r.notes.slice(0,80))+'</div>':''}
-                </div>`; }).join('')}
-                <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--green);flex-shrink:0">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
-              </div>`).join('')}
+              ${records.map(r=>{ const vname=(data.vehicles.find(v=>v.id===r.vehicleId)||{}).name||''; return '<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px"><div><div style="font-family:Rajdhani,sans-serif;font-weight:700;font-size:14px">'+esc(r.type)+' <span style="font-size:11px;color:var(--text-dim)">· '+esc(r.date)+'</span></div>'+(vname?'<div style="font-size:11px;color:var(--amber-dim);font-family:Share Tech Mono,monospace;margin-bottom:2px">🚜 '+esc(vname)+'</div>':'')+(r.notes?'<div style="font-size:12px;color:var(--text-dim)">'+esc(r.notes.slice(0,80))+'</div>':'')+'</div><div style="font-family:Share Tech Mono,monospace;font-size:13px;color:var(--green);flex-shrink:0">'+(r.cost?'$'+Number(r.cost).toLocaleString():'—')+'</div></div>'; }).join('')}
             </div>
             <div style="margin:12px 0 6px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)">Labor</div>
             <div id="labor-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px">
