@@ -658,7 +658,7 @@
           <div class="modal-body">
             <div class="form-row">
               <div class="form-group"><label class="form-lbl">Date *</label><input id="f-date" type="date" class="form-input" value="${esc(r?.date||today)}" /></div>
-              <div class="form-group"><label class="form-lbl">Service Type *</label><select id="f-type" class="form-select">${SERVICE_TYPES.map(t=>`<option value="${t}"${(r?.type||'Oil Change')===t?' selected':''}>${t}</option>`).join('')}</select></div>
+              <div class="form-group"><label class="form-lbl">Service Type *</label><input id="f-type" class="form-input" list="svc-type-opts" value="${esc(r?.type||'Oil Change')}" placeholder="Type or select..." autocomplete="off" /><datalist id="svc-type-opts">${SERVICE_TYPES.map(t=>`<option value="${t}"></option>`).join('')}</datalist></div>
               <div class="form-group"><label class="form-lbl">Cost ($)</label><input id="f-cost" type="number" class="form-input" value="${esc(r?.cost||'')}" placeholder="0.00" /></div>
               <div class="form-group"><label class="form-lbl">Hours / Miles at Service</label><input id="f-hours" type="number" class="form-input" value="${esc(r?.hours||'')}" placeholder="0" /></div>
               <div class="form-group"><label class="form-lbl">Performed By</label><input id="f-tech" class="form-input" value="${esc(r?.tech||'')}" placeholder="Self, Dealer, Shop..." /></div>
