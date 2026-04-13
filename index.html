@@ -150,6 +150,34 @@
     .cust-modal-actions { display:flex; gap:8px; }
     .back-cust-btn { background:none; border:none; color:var(--amber); font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:700; cursor:pointer; padding:0; letter-spacing:0.5px; transition:color .15s; }
     .back-cust-btn:hover { color:#f0b84e; }
+
+    /* INVOICES */
+    .inv-list { display:flex; flex-direction:column; gap:10px; }
+    .inv-card { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:16px 20px; display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center; }
+    .inv-card:hover { border-color:var(--border2); }
+    .inv-num { font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--amber-dim); font-weight:700; }
+    .inv-customer { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--text-bright); }
+    .inv-meta { font-size:12px; color:var(--text-dim); margin-top:2px; }
+    .inv-status { display:inline-block; font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:1px; text-transform:uppercase; padding:3px 10px; border-radius:12px; }
+    .inv-status.draft { background:rgba(107,114,128,.12); color:#6b7280; }
+    .inv-status.sent  { background:rgba(217,119,6,.12); color:var(--amber-dim); }
+    .inv-status.paid  { background:rgba(22,163,74,.12); color:#16a34a; }
+    .inv-total { font-family:'Share Tech Mono',monospace; font-size:18px; font-weight:700; color:var(--text-bright); text-align:right; }
+    .inv-actions { display:flex; gap:6px; margin-top:8px; justify-content:flex-end; }
+    .sr-cb { width:16px; height:16px; cursor:pointer; accent-color:var(--amber); flex-shrink:0; margin-top:2px; }
+    .sr-invoiced-badge { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase; background:rgba(22,163,74,.1); color:#16a34a; border:1px solid rgba(22,163,74,.25); padding:2px 7px; border-radius:10px; }
+    .invoice-bar { display:flex; align-items:center; justify-content:space-between; background:rgba(217,119,6,.08); border:1px solid rgba(217,119,6,.2); border-radius:6px; padding:10px 16px; margin-bottom:12px; }
+    .invoice-bar-msg { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:600; color:var(--amber-dim); }
+    .labor-row { display:grid; grid-template-columns:1fr 80px 80px auto; gap:8px; align-items:center; }
+    .labor-row input { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:7px 10px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; width:100%; }
+    .labor-row input:focus { border-color:var(--amber); }
+    /* PRINT invoice */
+    @media print {
+      .print-invoice { display:block !important; }
+      .no-print { display:none !important; }
+    }
+    .print-invoice { display:none; }
+
     /* REPORT */
     .report-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
     .report-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:140px; }
@@ -295,6 +323,12 @@
       else if (syncStatus==='offline') { dot.classList.add('offline'); if(lbl) lbl.textContent='Offline'; }
     }
     // Migrate old separate photo store into vehicle objects
+    function migrateInvoices(d) {
+      if (!d.invoices) d.invoices = [];
+      if (!d.settings) d.settings = {businessName: ''};
+      return d;
+    }
+
     function migrateCustomers(d) {
       // Add default customer if none exist
       if (!d.customers || d.customers.length === 0) {
@@ -339,14 +373,15 @@
     let data = (()=>{
       const d = loadData();
       if(!d||!d.vehicles?.length){ localStorage.setItem(STORAGE_KEY,JSON.stringify(SEED)); return SEED; }
-      return migrateCustomers(migratePhotos(d));
+      return migrateInvoices(migrateCustomers(migratePhotos(d)));
     })();
     let selectedCustomerId = null;
     let selectedId = null;
     let modalState = null;
     let pendingPhoto = undefined;
     let sidebarSearch = '';
-    let appView = 'fleet'; // fleet | report
+    let appView = 'fleet'; // fleet | report | invoices
+    let selectedRecordIds = new Set();
     let reportFilters = {year:'', equipment:'', partnum:'', make:'', keyword:'', customer:''};
 
 
@@ -372,6 +407,13 @@
       const parts = getPartsArray(r);
       const partsStr = parts.map(p=>[p.desc,p.num].filter(Boolean).join(': ')).join('; ');
       return {notes: getCleanNotes(r), parts: partsStr};
+    }
+
+    function nextInvoiceNum() {
+      const invs = data.invoices || [];
+      if (!invs.length) return 'INV-001';
+      const nums = invs.map(i => parseInt((i.num||'').replace('INV-',''))||0);
+      return 'INV-' + String(Math.max(...nums) + 1).padStart(3,'0');
     }
 
     function update(next) { data=next; saveData(next); render(); }
@@ -537,13 +579,25 @@
 
       const rows = recs.length===0
         ? `<div class="empty"><div class="empty-icon">🔧</div><div class="empty-title">No Service Records</div><div style="font-size:14px">Hit "+ Log Service" to add the first entry.</div></div>`
-        : `<div class="service-list">${recs.map(r=>{
+        : `${selectedRecordIds.size>0?`<div class="invoice-bar no-print">
+            <span class="invoice-bar-msg">📋 ${selectedRecordIds.size} record${selectedRecordIds.size>1?'s':''} selected</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" data-action="clear-selection">Clear</button>
+              <button class="btn btn-primary" data-action="create-invoice">Create Invoice</button>
+            </div>
+          </div>`:''}
+          <div class="service-list">${recs.map(r=>{
             const d=fmtDate(r.date);
-            return `<div class="sr">
-              <div class="sr-date"><div class="sr-day">${d.day}</div><div class="sr-mon">${d.mon}</div><div class="sr-yr">${d.yr}</div></div>
+            const checked = selectedRecordIds.has(r.id);
+            const inv = r.invoiced ? (data.invoices||[]).find(i=>i.id===r.invoiceId) : null;
+            return `<div class="sr${checked?' sr-selected':''}" style="${checked?'border-left-color:var(--amber);background:rgba(217,119,6,.04)':''}">
+              <div class="sr-date" style="display:flex;flex-direction:column;align-items:center;gap:6px">
+                <input type="checkbox" class="sr-cb no-print" data-action="toggle-record" data-id="${esc(r.id)}" ${checked?'checked':''} />
+                <div class="sr-day">${d.day}</div><div class="sr-mon">${d.mon}</div><div class="sr-yr">${d.yr}</div>
+              </div>
               ${(()=>{ const sp=splitNotesParts(r); return (
                 '<div>' +
-                  '<div class="sr-type">'+esc(r.type)+'</div>' +
+                  '<div class="sr-type">'+esc(r.type)+(r.invoiced?'  <span class="sr-invoiced-badge">✓ '+esc((inv&&inv.num)||'Invoiced')+'</span>':'')+'</div>' +
                   (sp.notes?'<div class="sr-notes">'+esc(sp.notes)+'</div>':'') +
                   '<div class="sr-tags">' +
                     (r.tech?'<span class="sr-tag">👤 '+esc(r.tech)+'</span>':'') +
@@ -556,8 +610,8 @@
               ); })()}
               <div class="sr-right">
                 <div class="sr-cost">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
-                <button class="btn btn-ghost btn-sm" data-action="edit-record" data-id="${esc(r.id)}">Edit</button>
-                <button class="btn btn-danger btn-sm" data-action="del-record" data-id="${esc(r.id)}">✕</button>
+                <button class="btn btn-ghost btn-sm no-print" data-action="edit-record" data-id="${esc(r.id)}">Edit</button>
+                <button class="btn btn-danger btn-sm no-print" data-action="del-record" data-id="${esc(r.id)}">✕</button>
               </div>
             </div>`;
           }).join('')}</div>`;
@@ -582,6 +636,181 @@
         ${rows}`;
     }
 
+
+
+    function renderInvoices() {
+      const invoices = (data.invoices||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+      const customers = data.customers||[];
+      const STATUS_COLORS = {draft:'draft',sent:'sent',paid:'paid'};
+
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="overview-title">Invoices</div>
+            <div class="overview-sub">${invoices.length} invoice${invoices.length!==1?'s':''} total</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-ghost btn-sm" data-action="open-settings">⚙ Settings</button>
+          </div>
+        </div>
+        ${invoices.length===0
+          ? `<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">No Invoices Yet</div><div style="font-size:14px">Select service records in the Fleet tab and click Create Invoice.</div></div>`
+          : `<div class="inv-list">${invoices.map(inv=>{
+              const cust = customers.find(c=>c.id===inv.customerId);
+              return `<div class="inv-card">
+                <div>
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                    <span class="inv-num">${esc(inv.num)}</span>
+                    <span class="inv-status ${STATUS_COLORS[inv.status]||'draft'}">${inv.status||'Draft'}</span>
+                  </div>
+                  <div class="inv-customer">${esc(cust?.name||'Unknown Customer')}</div>
+                  <div class="inv-meta">${esc(inv.date)} · ${inv.lineItems?.length||0} service record${(inv.lineItems?.length||0)!==1?'s':''}</div>
+                  ${inv.notes?`<div class="inv-meta" style="margin-top:4px;font-style:italic">${esc(inv.notes)}</div>`:''}
+                  <div class="inv-actions no-print">
+                    <button class="btn btn-ghost btn-sm" data-action="view-invoice" data-id="${esc(inv.id)}">View / Print</button>
+                    ${inv.status!=='paid'?`<button class="btn btn-ghost btn-sm" data-action="cycle-status" data-id="${esc(inv.id)}">${inv.status==='draft'?'Mark Sent':'Mark Paid'}</button>`:''}
+                    <button class="btn btn-danger btn-sm" data-action="del-invoice" data-id="${esc(inv.id)}">Delete</button>
+                  </div>
+                </div>
+                <div class="inv-total">$${Number(inv.total||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+              </div>`;
+            }).join('')}</div>`}`;
+    }
+
+
+    function invoiceModalHTML(records, custId) {
+      const cust = (data.customers||[]).find(c=>c.id===custId)||null;
+      const invNum = nextInvoiceNum();
+      const today = new Date().toISOString().slice(0,10);
+      const bizName = data.settings?.businessName||'';
+      const partsCost = records.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:680px;width:100%">
+          <div class="modal-hdr">
+            <div class="modal-title">Create Invoice ${esc(invNum)}</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Business Name</label><input id="f-inv-biz" class="form-input" value="${esc(bizName)}" placeholder="Your business name..." /></div>
+              <div class="form-group"><label class="form-lbl">Invoice Date</label><input id="f-inv-date" class="form-input" type="date" value="${today}" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Customer</label><input class="form-input" value="${esc(cust?.name||'')}" disabled /></div>
+            <div style="margin:12px 0 6px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)">Service Records (${records.length})</div>
+            <div style="border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:12px">
+              ${records.map(r=>`<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px">
+                <div>
+                  <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:14px">${esc(r.type)} <span style="font-size:11px;color:var(--text-dim)">· ${esc(r.date)}</span></div>
+                  ${r.notes?`<div style="font-size:12px;color:var(--text-dim)">${esc(r.notes.slice(0,80))}</div>`:''}
+                </div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--green);flex-shrink:0">${r.cost?'$'+Number(r.cost).toLocaleString():'—'}</div>
+              </div>`).join('')}
+            </div>
+            <div style="margin:12px 0 6px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim)">Labor</div>
+            <div id="labor-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px">
+              <div class="labor-row">
+                <input class="labor-desc" placeholder="Labor description..." />
+                <input class="labor-hrs" type="number" placeholder="Hrs" min="0" step="0.5" />
+                <input class="labor-rate" type="number" placeholder="Rate $" min="0" />
+                <button class="part-remove-btn" data-action="remove-labor">✕</button>
+              </div>
+            </div>
+            <button class="add-part-btn" data-action="add-labor" style="width:100%;margin-bottom:12px">+ Add Labor Line</button>
+            <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-inv-notes" class="form-textarea" placeholder="Payment terms, notes...">${''}</textarea></div>
+            <div style="text-align:right;padding:8px 0;border-top:1px solid var(--border);margin-top:4px">
+              <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim)">Parts / Service: </span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:14px;font-weight:700">$${partsCost.toFixed(2)}</span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);margin-left:16px">Labor: </span>
+              <span id="labor-total-display" style="font-family:'Share Tech Mono',monospace;font-size:14px;font-weight:700">$0.00</span>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-invoice">Save Invoice</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function viewInvoiceHTML(inv) {
+      const cust = (data.customers||[]).find(c=>c.id===inv.customerId)||null;
+      const partsCost = (inv.lineItems||[]).reduce((s,li)=>s+(parseFloat(li.cost)||0),0);
+      const laborCost = (inv.laborLines||[]).reduce((s,l)=>s+(parseFloat(l.total)||0),0);
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:700px;width:100%">
+          <div class="modal-hdr no-print">
+            <div class="modal-title">${esc(inv.num)}</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" data-action="print-invoice">🖨 Print</button>
+              <button class="modal-close" data-action="close-modal">✕</button>
+            </div>
+          </div>
+          <div class="modal-body" id="invoice-print-area">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+              <div>
+                <div style="font-family:'Rajdhani',sans-serif;font-size:28px;font-weight:700;color:var(--text-bright)">${esc(inv.businessName||'')}</div>
+                <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:2px">SERVICE INVOICE</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:18px;font-weight:700;color:var(--amber-dim)">${esc(inv.num)}</div>
+                <div style="font-size:13px;color:var(--text-dim)">${esc(inv.date)}</div>
+                <div style="margin-top:4px"><span class="inv-status ${inv.status||'draft'}">${inv.status||'Draft'}</span></div>
+              </div>
+            </div>
+            <div style="margin-bottom:16px;padding:10px 14px;background:var(--bg3);border-radius:4px">
+              <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-bottom:4px">BILL TO</div>
+              <div style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700">${esc(cust?.name||'')}</div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px">
+              <thead><tr style="border-bottom:2px solid var(--border)">
+                <th style="text-align:left;padding:6px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">DATE</th>
+                <th style="text-align:left;padding:6px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">SERVICE</th>
+                <th style="text-align:left;padding:6px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">VEHICLE</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">AMOUNT</th>
+              </tr></thead>
+              <tbody>
+                ${(inv.lineItems||[]).map(li=>`<tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:8px;color:var(--text-dim);white-space:nowrap">${esc(li.date)}</td>
+                  <td style="padding:8px"><div style="font-weight:600">${esc(li.type)}</div>${li.notes?`<div style="font-size:11px;color:var(--text-dim)">${esc(li.notes.slice(0,80))}</div>`:''}</td>
+                  <td style="padding:8px;color:var(--text-dim)">${esc(li.vehicleName||'')}</td>
+                  <td style="padding:8px;text-align:right;font-family:'Share Tech Mono',monospace;color:var(--green)">${li.cost?'$'+Number(li.cost).toLocaleString():'—'}</td>
+                </tr>`).join('')}
+                ${(inv.laborLines||[]).filter(l=>l.desc||l.total).map(l=>`<tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:8px;color:var(--text-dim)">Labor</td>
+                  <td style="padding:8px">${esc(l.desc||'Labor')}${l.hrs?` <span style="font-size:11px;color:var(--text-dim)">(${l.hrs} hrs @ $${l.rate}/hr)</span>`:''}</td>
+                  <td></td>
+                  <td style="padding:8px;text-align:right;font-family:'Share Tech Mono',monospace;color:var(--green)">$${Number(l.total||0).toFixed(2)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;margin-bottom:16px">
+              ${partsCost>0?`<div style="font-size:13px;color:var(--text-dim)">Parts / Service: <span style="font-family:'Share Tech Mono',monospace">$${partsCost.toFixed(2)}</span></div>`:''}
+              ${laborCost>0?`<div style="font-size:13px;color:var(--text-dim)">Labor: <span style="font-family:'Share Tech Mono',monospace">$${laborCost.toFixed(2)}</span></div>`:''}
+              <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;border-top:2px solid var(--border);padding-top:8px;margin-top:4px">Total: $${Number(inv.total||0).toFixed(2)}</div>
+            </div>
+            ${inv.notes?`<div style="font-size:12px;color:var(--text-dim);border-top:1px solid var(--border);padding-top:10px">${esc(inv.notes)}</div>`:''}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function settingsModalHTML() {
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr">
+            <div class="modal-title">Settings</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group"><label class="form-lbl">Business Name (appears on invoices)</label><input id="f-biz-name" class="form-input" value="${esc(data.settings?.businessName||'')}" placeholder="e.g. Mattson Bros Farms" /></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-settings">Save</button>
+          </div>
+        </div>
+      </div>`;
+    }
 
     function customerModalHTML(c) {
       return `<div class="modal-overlay" id="modal-bg">
@@ -818,6 +1047,9 @@
         if (modalState.type==='vehicle') modal = vehicleModalHTML(modalState.target);
         else if (modalState.type==='record') modal = recordModalHTML(modalState.target);
         else if (modalState.type==='customer') modal = customerModalHTML(modalState.target);
+        else if (modalState.type==='invoice') modal = invoiceModalHTML(modalState.records, modalState.custId);
+        else if (modalState.type==='view-invoice') modal = viewInvoiceHTML(modalState.target);
+        else if (modalState.type==='settings') modal = settingsModalHTML();
       }
 
       document.getElementById('app').innerHTML = `
@@ -837,9 +1069,12 @@
         <div class="tab-bar">
           <button class="tab-btn${appView==='fleet'?' active':''}" data-action="tab-fleet">Fleet</button>
           <button class="tab-btn${appView==='report'?' active':''}" data-action="tab-report">Report</button>
+          <button class="tab-btn${appView==='invoices'?' active':''}" data-action="tab-invoices">Invoices${(data.invoices||[]).length>0?' ('+( data.invoices.length)+')':''}</button>
         </div>
         ${appView==='report'
           ? `<div class="main"><div class="main-content">${renderReport()}</div></div>`
+          : appView==='invoices'
+          ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
           : `<div class="layout">
               ${renderSidebar()}
               <div class="main"><div class="main-content">${selected?renderDetail(selected):renderOverview()}</div></div>
@@ -889,6 +1124,100 @@
           update({...data,customers:[...(data.customers||[]),nc]});
         }
         modalState=null; render();
+      } else if (action==='toggle-record') {
+        if (selectedRecordIds.has(id)) selectedRecordIds.delete(id);
+        else selectedRecordIds.add(id);
+        render();
+      } else if (action==='clear-selection') {
+        selectedRecordIds.clear(); render();
+      } else if (action==='create-invoice') {
+        const records = [...selectedRecordIds].map(rid=>data.records.find(r=>r.id===rid)).filter(Boolean);
+        const alreadyInvoiced = records.filter(r=>r.invoiced);
+        if (alreadyInvoiced.length > 0) {
+          const names = alreadyInvoiced.map(r=>r.type+' ('+r.date+')').join(', ');
+          if (!confirm(alreadyInvoiced.length+' record(s) already invoiced: '+names+'. Include anyway?')) return;
+        }
+        const v = data.vehicles.find(v=>v.id===selectedId);
+        const custId = v?.customerId || selectedCustomerId;
+        modalState = {type:'invoice', records, custId};
+        render();
+      } else if (action==='save-invoice') {
+        const bizName = document.getElementById('f-inv-biz').value.trim();
+        const invDate = document.getElementById('f-inv-date').value;
+        const notes = document.getElementById('f-inv-notes').value;
+        // Save business name to settings
+        const newSettings = {...(data.settings||{}), businessName: bizName};
+        // Read labor rows
+        const laborRows = document.querySelectorAll('#labor-list .labor-row');
+        const laborLines = [];
+        laborRows.forEach(function(row) {
+          const desc = row.querySelector('.labor-desc')?.value?.trim()||'';
+          const hrs = parseFloat(row.querySelector('.labor-hrs')?.value)||0;
+          const rate = parseFloat(row.querySelector('.labor-rate')?.value)||0;
+          const total = hrs && rate ? hrs*rate : (parseFloat(row.querySelector('.labor-rate')?.value)||0);
+          if (desc || total) laborLines.push({desc, hrs:hrs||'', rate:rate||'', total:total});
+        });
+        const records = modalState.records || [];
+        const lineItems = records.map(r=>({
+          recordId:r.id, vehicleId:r.vehicleId,
+          vehicleName:(data.vehicles.find(v=>v.id===r.vehicleId)||{}).name||'',
+          date:r.date, type:r.type, notes:r.notes, cost:r.cost||''
+        }));
+        const partsCost = records.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
+        const laborCost = laborLines.reduce((s,l)=>s+(parseFloat(l.total)||0),0);
+        const total = partsCost + laborCost;
+        const inv = {
+          id: uid(), num: nextInvoiceNum(),
+          customerId: modalState.custId, date: invDate,
+          status: 'draft', businessName: bizName,
+          lineItems, laborLines, notes, total
+        };
+        // Mark records as invoiced
+        const invoicedIds = new Set(records.map(r=>r.id));
+        const newRecords = data.records.map(r=>invoicedIds.has(r.id)?{...r, invoiced:true, invoiceId:inv.id}:r);
+        selectedRecordIds.clear();
+        modalState = null;
+        update({...data, settings:newSettings, invoices:[...(data.invoices||[]),inv], records:newRecords});
+      } else if (action==='add-labor') {
+        const list = document.getElementById('labor-list');
+        if (!list) return;
+        const div = document.createElement('div');
+        div.className = 'labor-row';
+        div.innerHTML = '<input class="labor-desc" placeholder="Labor description..." /><input class="labor-hrs" type="number" placeholder="Hrs" min="0" step="0.5" /><input class="labor-rate" type="number" placeholder="Rate $" min="0" /><button class="part-remove-btn" data-action="remove-labor">✕</button>';
+        list.appendChild(div);
+      } else if (action==='remove-labor') {
+        el.closest('.labor-row')?.remove();
+      } else if (action==='view-invoice') {
+        const inv = (data.invoices||[]).find(i=>i.id===id);
+        if (inv) { modalState={type:'view-invoice',target:inv}; render(); }
+      } else if (action==='print-invoice') {
+        const area = document.getElementById('invoice-print-area');
+        if (!area) return;
+        const w = window.open('','_blank','width=800,height=900');
+        w.document.write('<html><head><title>Invoice</title><style>body{font-family:sans-serif;padding:30px;max-width:700px;margin:0 auto}.inv-status{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;text-transform:uppercase;letter-spacing:1px}.draft{background:#f3f4f6;color:#6b7280}.sent{background:#fef3c7;color:#b45309}.paid{background:#dcfce7;color:#16a34a}table{width:100%;border-collapse:collapse}th,td{padding:8px;text-align:left;border-bottom:1px solid #e5e7eb}th{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#6b7280}</style></head><body>');
+        w.document.write(area.innerHTML);
+        w.document.write('</body></html>');
+        w.document.close();
+        w.focus();
+        setTimeout(function(){w.print();},400);
+      } else if (action==='cycle-status') {
+        const invs = (data.invoices||[]).map(i=>i.id===id?{...i,status:i.status==='draft'?'sent':'paid'}:i);
+        update({...data,invoices:invs});
+      } else if (action==='del-invoice') {
+        if(!confirm('Delete this invoice? Service records will be unmarked as invoiced.'))return;
+        const inv = (data.invoices||[]).find(i=>i.id===id);
+        if(!inv) return;
+        const invoicedIds = new Set((inv.lineItems||[]).map(l=>l.recordId));
+        const newRecords = data.records.map(r=>invoicedIds.has(r.id)?{...r,invoiced:false,invoiceId:''}:r);
+        update({...data,invoices:(data.invoices||[]).filter(i=>i.id!==id),records:newRecords});
+      } else if (action==='open-settings') {
+        modalState={type:'settings'}; render();
+      } else if (action==='save-settings') {
+        const bizName = document.getElementById('f-biz-name').value.trim();
+        update({...data,settings:{...(data.settings||{}),businessName:bizName}});
+        modalState=null; render();
+      } else if (action==='tab-invoices') {
+        appView='invoices'; render();
       } else if (action==='tab-fleet') {
         appView='fleet'; render();
       } else if (action==='tab-report') {
