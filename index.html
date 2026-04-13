@@ -94,7 +94,8 @@
     .sr-partcol { display:flex; flex-direction:column; gap:6px; padding-top:2px; }
     .sr-part-row { display:flex; flex-direction:column; gap:1px; }
     .parts-list { display:flex; flex-direction:column; gap:8px; }
-    .part-entry { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:center; }
+    .part-entry { display:grid; grid-template-columns:1fr 1fr 90px auto; gap:8px; align-items:center; }
+    .part-cost-val { font-family:'Share Tech Mono',monospace; font-size:11px; color:#16a34a; margin-top:1px; }
     .part-entry input { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:7px 10px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; transition:border-color .15s; width:100%; }
     .part-entry input:focus { border-color:var(--amber); }
     .part-remove-btn { background:rgba(220,38,38,.1); border:1px solid rgba(220,38,38,.25); color:#dc2626; border-radius:4px; padding:6px 10px; cursor:pointer; font-size:14px; line-height:1; }
@@ -550,7 +551,7 @@
                   '</div>' +
                 '</div>' +
                 '<div class="sr-partcol">' +
-                  (()=>{ const pa=getPartsArray(r); if(!pa.length) return ''; return '<div class="sr-partcol-lbl">Parts</div>' + pa.map(p=>'<div class="sr-part-row">' + (p.desc?'<span style="font-size:11px;color:var(--text-dim)">'+esc(p.desc)+'</span>':'') + (p.num?'<span class="sr-partcol-val">'+esc(p.num)+'</span>':'') + '</div>').join(''); })() +
+                  (()=>{ const pa=getPartsArray(r); if(!pa.length) return ''; return '<div class="sr-partcol-lbl">Parts</div>' + pa.map(p=>'<div class="sr-part-row">' + (p.desc?'<span style="font-size:11px;color:var(--text-dim)">'+esc(p.desc)+'</span>':'') + (p.num?'<span class="sr-partcol-val">'+esc(p.num)+'</span>':'') + (p.cost?'<span class="part-cost-val">$'+Number(p.cost).toLocaleString()+'</span>':'') + '</div>').join(''); })() +
                 '</div>'
               ); })()}
               <div class="sr-right">
@@ -671,6 +672,7 @@
                       <div class="part-entry" data-part-idx="${i}">
                         <input class="part-desc-input" placeholder="Description (optional)" value="${esc(p.desc||'')}" />
                         <input class="part-num-input" placeholder="Part #" value="${esc(p.num||p||'')}" />
+                        <input class="part-cost-input" type="number" placeholder="Cost $" value="${esc(String(p.cost||''))}" style="width:100%" />
                         <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
                       </div>`).join('');
                   })()}
@@ -910,7 +912,7 @@
         const div = document.createElement('div');
         div.className = 'part-entry';
         div.dataset.partIdx = idx;
-        div.innerHTML = '<input class="part-desc-input" placeholder="Description (optional)" /><input class="part-num-input" placeholder="Part #" /><button class="part-remove-btn" data-action="remove-part" data-idx="'+idx+'">✕</button>';
+        div.innerHTML = '<input class="part-desc-input" placeholder="Description (optional)" /><input class="part-num-input" placeholder="Part #" /><input class="part-cost-input" type="number" placeholder="Cost $" style="width:100%" /><button class="part-remove-btn" data-action="remove-part" data-idx="'+idx+'">✕</button>';
         list.appendChild(div);
       } else if (action==='remove-part') {
         const entry = el.closest('.part-entry');
@@ -922,7 +924,7 @@
             const div = document.createElement('div');
             div.className = 'part-entry';
             div.dataset.partIdx = 0;
-            div.innerHTML = '<input class="part-desc-input" placeholder="Description (optional)" /><input class="part-num-input" placeholder="Part #" /><button class="part-remove-btn" data-action="remove-part" data-idx="0">✕</button>';
+            div.innerHTML = '<input class="part-desc-input" placeholder="Description (optional)" /><input class="part-num-input" placeholder="Part #" /><input class="part-cost-input" type="number" placeholder="Cost $" style="width:100%" /><button class="part-remove-btn" data-action="remove-part" data-idx="0">✕</button>';
             list.appendChild(div);
           }
         }
@@ -975,10 +977,15 @@
         partEntries.forEach(function(entry) {
           const desc = entry.querySelector('.part-desc-input')?.value?.trim()||'';
           const num = entry.querySelector('.part-num-input')?.value?.trim()||'';
-          if (desc || num) partsArr.push({desc:desc, num:num});
+          const cost = entry.querySelector('.part-cost-input')?.value?.trim()||'';
+          if (desc || num) partsArr.push({desc:desc, num:num, cost:cost});
         });
+        // Auto-sum parts costs
+        const partsTotalCost = partsArr.reduce(function(s,p){return s+(parseFloat(p.cost)||0);},0);
+        const manualCost = document.getElementById('f-cost').value;
+        const finalCost = manualCost || (partsTotalCost > 0 ? String(partsTotalCost) : '');
         const form={date,type,
-          cost:document.getElementById('f-cost').value,
+          cost: finalCost,
           hours:document.getElementById('f-hours').value,
           tech:document.getElementById('f-tech').value,
           parts: partsArr,
