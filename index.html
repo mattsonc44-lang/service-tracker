@@ -671,7 +671,7 @@
                     return pa.map((p,i)=>`
                       <div class="part-entry" data-part-idx="${i}">
                         <input class="part-desc-input" placeholder="Description (optional)" value="${esc(p.desc||'')}" />
-                        <input class="part-num-input" placeholder="Part #" value="${esc(p.num||p||'')}" />
+                        <input class="part-num-input" placeholder="Part #" value="${esc(p.num||'')}" />
                         <input class="part-cost-input" type="number" placeholder="Cost $" value="${esc(String(p.cost||''))}" style="width:100%" />
                         <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
                       </div>`).join('');
