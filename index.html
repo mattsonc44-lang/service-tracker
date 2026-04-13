@@ -91,7 +91,16 @@
     .sr-yr { font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--text-dim); }
     .sr-type { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--text-bright); margin-bottom:3px; }
     .sr-notes { font-size:13px; color:var(--text-dim); line-height:1.4; margin-bottom:6px; }
-    .sr-partcol { display:flex; flex-direction:column; gap:4px; padding-top:2px; }
+    .sr-partcol { display:flex; flex-direction:column; gap:6px; padding-top:2px; }
+    .sr-part-row { display:flex; flex-direction:column; gap:1px; }
+    .parts-list { display:flex; flex-direction:column; gap:8px; }
+    .part-entry { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; align-items:center; }
+    .part-entry input { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:7px 10px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; transition:border-color .15s; width:100%; }
+    .part-entry input:focus { border-color:var(--amber); }
+    .part-remove-btn { background:rgba(220,38,38,.1); border:1px solid rgba(220,38,38,.25); color:#dc2626; border-radius:4px; padding:6px 10px; cursor:pointer; font-size:14px; line-height:1; }
+    .part-remove-btn:hover { background:rgba(220,38,38,.2); }
+    .add-part-btn { background:none; border:1px dashed var(--border2); border-radius:4px; color:var(--text-dim); font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:600; padding:7px 12px; cursor:pointer; transition:border-color .15s,color .15s; margin-top:2px; }
+    .add-part-btn:hover { border-color:var(--amber); color:var(--amber); }
     .sr-partcol-lbl { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:2px; }
     .sr-partcol-val { font-family:'Share Tech Mono',monospace; font-size:12px; color:var(--amber-dim); word-break:break-word; line-height:1.4; }
     .sr-tags { display:flex; gap:6px; flex-wrap:wrap; }
@@ -340,13 +349,28 @@
     let reportFilters = {year:'', equipment:'', partnum:'', make:'', keyword:'', customer:''};
 
 
-    // Split "notes | Parts: xxx" into {notes, parts}
-    function splitNotesParts(r) {
-      if (r.partnum) return {notes: r.notes||'', parts: r.partnum};
+    // Get parts as array from record (supports old partnum string and new parts array)
+    function getPartsArray(r) {
+      if (r.parts && Array.isArray(r.parts) && r.parts.length > 0) return r.parts;
+      if (r.partnum) return [{desc:'', num: r.partnum}];
+      // legacy: split from notes
       const raw = r.notes || '';
       const idx = raw.indexOf(' | Parts:');
-      if (idx === -1) return {notes: raw, parts: ''};
-      return {notes: raw.slice(0, idx).trim(), parts: raw.slice(idx + 9).trim()};
+      if (idx !== -1) return [{desc:'', num: raw.slice(idx + 9).trim()}];
+      return [];
+    }
+    function getCleanNotes(r) {
+      if (r.parts) return r.notes||'';
+      if (r.partnum) return r.notes||'';
+      const raw = r.notes||'';
+      const idx = raw.indexOf(' | Parts:');
+      return idx === -1 ? raw : raw.slice(0, idx).trim();
+    }
+    // Keep for report compat
+    function splitNotesParts(r) {
+      const parts = getPartsArray(r);
+      const partsStr = parts.map(p=>[p.desc,p.num].filter(Boolean).join(': ')).join('; ');
+      return {notes: getCleanNotes(r), parts: partsStr};
     }
 
     function update(next) { data=next; saveData(next); render(); }
@@ -526,7 +550,7 @@
                   '</div>' +
                 '</div>' +
                 '<div class="sr-partcol">' +
-                  (sp.parts?'<div class="sr-partcol-lbl">Part #</div><div class="sr-partcol-val">'+esc(sp.parts)+'</div>':'') +
+                  (()=>{ const pa=getPartsArray(r); if(!pa.length) return ''; return '<div class="sr-partcol-lbl">Parts</div>' + pa.map(p=>'<div class="sr-part-row">' + (p.desc?'<span style="font-size:11px;color:var(--text-dim)">'+esc(p.desc)+'</span>':'') + (p.num?'<span class="sr-partcol-val">'+esc(p.num)+'</span>':'') + '</div>').join(''); })() +
                 '</div>'
               ); })()}
               <div class="sr-right">
@@ -637,7 +661,22 @@
               <div class="form-group"><label class="form-lbl">Cost ($)</label><input id="f-cost" type="number" class="form-input" value="${esc(r?.cost||'')}" placeholder="0.00" /></div>
               <div class="form-group"><label class="form-lbl">Hours / Miles at Service</label><input id="f-hours" type="number" class="form-input" value="${esc(r?.hours||'')}" placeholder="0" /></div>
               <div class="form-group"><label class="form-lbl">Performed By</label><input id="f-tech" class="form-input" value="${esc(r?.tech||'')}" placeholder="Self, Dealer, Shop..." /></div>
-              <div class="form-group"><label class="form-lbl">Part #</label><input id="f-partnum" class="form-input" value="${esc(r?.partnum||'')}" placeholder="Part number..." /></div>
+              <div class="form-group form-full">
+                <label class="form-lbl" style="margin-bottom:6px">Parts Used</label>
+                <div class="parts-list" id="parts-list">
+                  ${(()=>{
+                    const pa = r ? getPartsArray(r) : [];
+                    if (pa.length === 0) pa.push({desc:'',num:''});
+                    return pa.map((p,i)=>`
+                      <div class="part-entry" data-part-idx="${i}">
+                        <input class="part-desc-input" placeholder="Description (optional)" value="${esc(p.desc||'')}" />
+                        <input class="part-num-input" placeholder="Part #" value="${esc(p.num||p||'')}" />
+                        <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
+                      </div>`).join('');
+                  })()}
+                </div>
+                <button class="add-part-btn" data-action="add-part" style="width:100%;margin-top:6px">+ Add Another Part</button>
+              </div>
               <div class="form-group form-full"><label class="form-lbl">Notes / Parts Used</label><textarea id="f-notes" class="form-textarea" placeholder="Work done, parts replaced...">${esc(r?.notes||'')}</textarea></div>
             </div>
           </div>
@@ -863,6 +902,30 @@
         if(!confirm('Delete this vehicle and all its service records?'))return;
         if(selectedId===id) selectedId=null;
         update({vehicles:data.vehicles.filter(v=>v.id!==id),records:data.records.filter(r=>r.vehicleId!==id)});
+      } else if (action==='add-part') {
+        // Add a new part row without re-rendering
+        const list = document.getElementById('parts-list');
+        if (!list) return;
+        const idx = list.querySelectorAll('.part-entry').length;
+        const div = document.createElement('div');
+        div.className = 'part-entry';
+        div.dataset.partIdx = idx;
+        div.innerHTML = '<input class="part-desc-input" placeholder="Description (optional)" /><input class="part-num-input" placeholder="Part #" /><button class="part-remove-btn" data-action="remove-part" data-idx="'+idx+'">✕</button>';
+        list.appendChild(div);
+      } else if (action==='remove-part') {
+        const entry = el.closest('.part-entry');
+        if (entry) {
+          const list = entry.parentNode;
+          entry.remove();
+          // Don't re-render, just remove the DOM element
+          if (list.querySelectorAll('.part-entry').length === 0) {
+            const div = document.createElement('div');
+            div.className = 'part-entry';
+            div.dataset.partIdx = 0;
+            div.innerHTML = '<input class="part-desc-input" placeholder="Description (optional)" /><input class="part-num-input" placeholder="Part #" /><button class="part-remove-btn" data-action="remove-part" data-idx="0">✕</button>';
+            list.appendChild(div);
+          }
+        }
       } else if (action==='add-record') {
         modalState={type:'record',target:null}; render();
       } else if (action==='edit-record') {
@@ -906,12 +969,20 @@
         const date=document.getElementById('f-date').value;
         const type=document.getElementById('f-type').value;
         if(!date||!type){alert('Date and type are required.');return;}
-        const partnumEl = document.getElementById('f-partnum');
+        // Read parts array from dynamic list
+        const partEntries = document.querySelectorAll('#parts-list .part-entry');
+        const partsArr = [];
+        partEntries.forEach(function(entry) {
+          const desc = entry.querySelector('.part-desc-input')?.value?.trim()||'';
+          const num = entry.querySelector('.part-num-input')?.value?.trim()||'';
+          if (desc || num) partsArr.push({desc:desc, num:num});
+        });
         const form={date,type,
           cost:document.getElementById('f-cost').value,
           hours:document.getElementById('f-hours').value,
           tech:document.getElementById('f-tech').value,
-          partnum:partnumEl ? partnumEl.value : '',
+          parts: partsArr,
+          partnum: partsArr.length>0 ? partsArr.map(p=>[p.desc,p.num].filter(Boolean).join(': ')).join('; ') : '',
           notes:document.getElementById('f-notes').value,
         };
         let vehicles=data.vehicles;
