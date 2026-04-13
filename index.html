@@ -782,7 +782,20 @@
               <td class="td-date">${r.date||''}</td>
               <td class="td-vehicle" data-action="select-from-report" data-id="${esc(r.vehicleId)}">${esc(r._v.name)}</td>
               <td class="td-type">${esc(r.type)}</td>
-              ${(()=>{ const sp=splitNotesParts(r); return '<td class="td-notes">'+esc(sp.notes.slice(0,120))+'</td><td class="td-part">'+esc(sp.parts.slice(0,80))+'</td>'; })()}
+              ${(()=>{
+                const sp=splitNotesParts(r);
+                const pa=getPartsArray(r);
+                const partsHtml = pa.length
+                  ? pa.map(p=>{
+                      let line = '';
+                      if(p.desc) line += '<span style="color:var(--text-dim);display:block">'+esc(p.desc)+'</span>';
+                      if(p.num) line += '<span style="display:block">'+esc(p.num)+'</span>';
+                      if(p.cost) line += '<span style="color:#16a34a;display:block">$'+Number(p.cost).toLocaleString()+'</span>';
+                      return '<div style="margin-bottom:4px;border-bottom:1px solid #f0f2f5;padding-bottom:4px">'+line+'</div>';
+                    }).join('')
+                  : '';
+                return '<td class="td-notes">'+esc(sp.notes.slice(0,120))+'</td><td class="td-part">'+partsHtml+'</td>';
+              })()}
               <td style="font-size:12px;color:var(--text-dim)">${esc(r.tech||'')}</td>
               <td class="td-cost">${r.cost?'$'+Number(r.cost).toLocaleString():''}</td>
             </tr>`).join('')}
