@@ -878,6 +878,7 @@
                 <th>Vendor</th>
                 <th>Description</th>
                 <th>Part #</th>
+                <th style="text-align:center">Qty</th>
                 <th>Vehicle</th>
                 <th style="text-align:center">Ordered</th>
                 <th style="text-align:center">Received</th>
@@ -894,6 +895,7 @@
                     <td style="font-weight:600">${esc(p.desc||'')}</td>
                     <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
                     <td style="font-size:12px;color:var(--text-dim)">${veh?esc(veh.name):''}</td>
+                    <td style="text-align:center;font-family:'Share Tech Mono',monospace;font-weight:700">${p.qty||''}</td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-received" data-id="${esc(p.id)}" ${p.received?'checked':''} /></td>
                     <td><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
@@ -1449,10 +1451,10 @@
         if(alreadyOrdered){ alert('This part is already on the order list.'); return; }
         const newOrder = {
           id:uid(), vendor:p.vendor||'', desc:p.name, num:p.num||'',
-          vehicleId:'', invPartId:id, ordered:false, received:false
+          qty:'1', vehicleId:'', invPartId:id, ordered:false, received:false
         };
+        appView='parts';
         update({...data, partsToOrder:[...(data.partsToOrder||[]), newOrder]});
-        // Switch to Order Parts tab so they can see it
         appView='parts'; render();
       } else if (action==='inv-qty-dec') {
         const inv = (data.partsInventory||[]).map(p=>p.id===id?{...p,qty:String(Math.max(0,(parseInt(p.qty)||0)-1))}:p);
@@ -1482,8 +1484,9 @@
         const desc   = document.getElementById('po-desc')?.value?.trim()||'';
         const num    = document.getElementById('po-num')?.value?.trim()||'';
         const vehicleId = document.getElementById('po-vehicle')?.value||'';
+        const qty = document.getElementById('po-qty')?.value?.trim()||'';
         if (!desc && !num) { alert('Enter a description or part number.'); return; }
-        const newPart = {id:uid(), vendor, desc, num, vehicleId, ordered:false, received:false};
+        const newPart = {id:uid(), vendor, desc, num, qty, vehicleId, ordered:false, received:false};
         update({...data, partsToOrder:[...(data.partsToOrder||[]), newPart]});
       } else if (action==='toggle-part-ordered') {
         const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, ordered:!p.ordered}:p);
