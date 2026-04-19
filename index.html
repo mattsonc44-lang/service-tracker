@@ -846,7 +846,7 @@
             <div class="overview-title">Order Parts</div>
             <div class="overview-sub">${parts.length} item${parts.length!==1?'s':''} total</div>
           </div>
-          ${received>0?`<button class="btn btn-ghost btn-sm" data-action="clear-received-parts">Clear Received</button>`:''}
+          ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}  ${received>0?`<button class="btn btn-ghost btn-sm" data-action="clear-received-parts">Clear Received</button>`:''}
         </div>
 
         <div class="po-summary">
@@ -1288,6 +1288,46 @@
         ${modal}`;
     }
 
+
+    // Returns {action:'combine',match} or {action:'ask',match} or {action:'new'}
+    function checkDuplicateOrder(num, vendor, desc, excludeId) {
+      const list = (data.partsToOrder||[]).filter(o=>!o.ordered&&!o.received&&o.id!==excludeId);
+      if (!num) {
+        // No part#, fall back to desc match
+        const m = list.find(o=>desc && o.desc && o.desc.toLowerCase()===desc.toLowerCase());
+        return m ? {action:'ask', match:m, sameVendor:true} : {action:'new'};
+      }
+      // Match by part# (case-insensitive, strip spaces/dashes)
+      const cleanNum = num.toLowerCase().replace(/[\s\-]/g,'');
+      const m = list.find(o=>o.num && o.num.toLowerCase().replace(/[\s\-]/g,'')===cleanNum);
+      if (!m) return {action:'new'};
+      const sameVendor = !vendor || !m.vendor || vendor.toLowerCase()===m.vendor.toLowerCase();
+      return {action: sameVendor ? 'combine' : 'ask', match:m, sameVendor};
+    }
+
+    function applyDuplicateCheck(num, vendor, desc, qty, vehicleId, invPartId, onNew) {
+      const result = checkDuplicateOrder(num, vendor, desc, null);
+      const addQtyNum = parseInt(qty)||1;
+      if (result.action==='combine') {
+        // Same part#, same vendor — silently combine
+        const newQty = (parseInt(result.match.qty)||0) + addQtyNum;
+        update({...data, partsToOrder:(data.partsToOrder||[]).map(o=>o.id===result.match.id?{...o,qty:String(newQty)}:o)});
+        appView='parts'; render();
+      } else if (result.action==='ask') {
+        const m = result.match;
+        const msg = 'Part# '+num+' is already on the list'+(m.vendor?' from '+m.vendor:'')+' (qty: '+(m.qty||'-')+').\n'+(result.sameVendor?'':'Different vendor (yours: '+(vendor||'none')+').\n')+'Add '+addQtyNum+' to that line? (Cancel = add as separate line)';
+        if (confirm(msg)) {
+          const newQty = (parseInt(m.qty)||0) + addQtyNum;
+          update({...data, partsToOrder:(data.partsToOrder||[]).map(o=>o.id===m.id?{...o,qty:String(newQty)}:o)});
+          appView='parts'; render();
+        } else {
+          onNew();
+        }
+      } else {
+        onNew();
+      }
+    }
+
     document.getElementById('app').addEventListener('click', function(e) {
       // Handle search input live typing
       if (e.target.id === 'sidebar-search-input') return;
@@ -1486,8 +1526,10 @@
         const vehicleId = document.getElementById('po-vehicle')?.value||'';
         const qty = document.getElementById('po-qty')?.value?.trim()||'';
         if (!desc && !num) { alert('Enter a description or part number.'); return; }
-        const newPart = {id:uid(), vendor, desc, num, qty, vehicleId, ordered:false, received:false};
-        update({...data, partsToOrder:[...(data.partsToOrder||[]), newPart]});
+        applyDuplicateCheck(num, vendor, desc, qty, vehicleId, null, function(){
+          const newPart = {id:uid(), vendor, desc, num, qty, vehicleId, ordered:false, received:false};
+          update({...data, partsToOrder:[...(data.partsToOrder||[]), newPart]});
+        });
       } else if (action==='toggle-part-ordered') {
         const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, ordered:!p.ordered}:p);
         update({...data, partsToOrder:parts});
@@ -1504,6 +1546,32 @@
       } else if (action==='del-part-order') {
         if(!confirm('Remove this part?'))return;
         update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>p.id!==id)});
+      } else if (action==='consolidate-orders') {
+        // Merge unordered items with same part# (same vendor → auto, diff vendor → skip)
+        const unordered = (data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received);
+        const ordered = (data.partsToOrder||[]).filter(p=>p.ordered||p.received);
+        const merged = [];
+        const seen = {};
+        unordered.forEach(function(p){
+          const key = p.num ? p.num.toLowerCase().replace(/[\s\-]/g,'') : null;
+          if(key && seen[key]) {
+            // Same part# — combine if same vendor or no vendor
+            const existing = seen[key];
+            const sameV = !p.vendor||!existing.vendor||p.vendor.toLowerCase()===existing.vendor.toLowerCase();
+            if(sameV){
+              existing.qty = String((parseInt(existing.qty)||0)+(parseInt(p.qty)||1));
+              return;
+            }
+          }
+          const copy = {...p};
+          merged.push(copy);
+          if(key) seen[key]=copy;
+        });
+        const total = unordered.length - merged.length;
+        if(total===0){ alert('No duplicates found to consolidate.'); return; }
+        if(confirm('Consolidate '+total+' duplicate line'+(total!==1?'s':'')+' by part number?')){
+          update({...data, partsToOrder:[...merged,...ordered]});
+        }
       } else if (action==='clear-received-parts') {
         if(!confirm('Remove all received parts from the list?'))return;
         update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>!p.received)});
