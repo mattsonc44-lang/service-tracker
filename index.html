@@ -106,7 +106,7 @@
     .part-inv-opt-qty.ok { background:rgba(22,163,74,.1); color:#16a34a; }
     .part-inv-opt-qty.low { background:rgba(217,119,6,.1); color:#d97706; }
     .part-inv-opt-qty.none { background:rgba(220,38,38,.1); color:#dc2626; }
-    .part-entry { display:grid; grid-template-columns:1fr 1fr 90px auto; gap:8px; align-items:center; }
+    .part-entry { display:grid; grid-template-columns:1fr 1fr 60px 90px auto; gap:8px; align-items:center; }
     .part-cost-val { font-family:'Share Tech Mono',monospace; font-size:11px; color:#16a34a; margin-top:1px; }
     .part-entry input { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:7px 10px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; transition:border-color .15s; width:100%; }
     .part-entry input:focus { border-color:var(--amber); }
@@ -1118,6 +1118,7 @@
                           <div class="part-inv-dropdown" style="display:none"></div>
                         </div>
                         <input class="part-num-input" placeholder="Part #" value="${esc(p.num||'')}" />
+                        <input class="part-qty-input" type="number" placeholder="Qty" value="${p.qtyUsed||'1'}" min="1" style="width:100%" />
                         <input class="part-cost-input" type="number" placeholder="Cost $" value="${esc(String(p.cost||''))}" style="width:100%" />
                         <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
                       </div>`).join('');
@@ -1726,7 +1727,8 @@
           const invPartId = entry.dataset.invId || '';
           const num = entry.querySelector('.part-num-input')?.value?.trim()||'';
           const cost = entry.querySelector('.part-cost-input')?.value?.trim()||'';
-          if (desc || num) partsArr.push({desc:desc, num:num, cost:cost, invPartId});
+          const qtyUsed = entry.querySelector('.part-qty-input')?.value?.trim()||'1';
+          if (desc || num) partsArr.push({desc:desc, num:num, cost:cost, qtyUsed, invPartId});
         });
         // Auto-sum parts costs
         const partsTotalCost = partsArr.reduce(function(s,p){return s+(parseFloat(p.cost)||0);},0);
@@ -1747,10 +1749,49 @@
           if(veh&&newHrs>(parseFloat(veh.hours)||0))
             vehicles=data.vehicles.map(v=>v.id===selectedId?{...v,hours:String(newHrs)}:v);
         }
-        if(modalState.target) {
-          update({...data,vehicles:vehicles,records:data.records.map(r=>r.id===modalState.target.id?{...modalState.target,...form}:r)});
+        // Deduct used parts from inventory
+        let partsInventory = data.partsInventory || [];
+        const isEdit = !!modalState.target;
+        if (!isEdit) {
+          // New record: deduct qty used for linked inventory parts
+          partsArr.forEach(function(p) {
+            if (p.invPartId) {
+              const qtyUsedNum = parseInt(p.qtyUsed)||1;
+              partsInventory = partsInventory.map(function(ip) {
+                return ip.id===p.invPartId
+                  ? {...ip, qty: String(Math.max(0,(parseInt(ip.qty)||0)-qtyUsedNum))}
+                  : ip;
+              });
+            }
+          });
         } else {
-          update({...data,vehicles:vehicles,records:[...data.records,{id:uid(),vehicleId:selectedId,...form}]});
+          // Edit: compare old parts vs new parts for inventory delta
+          const oldParts = getPartsArray(modalState.target);
+          // Restore old quantities
+          oldParts.forEach(function(p) {
+            if (p.invPartId) {
+              const oldQty = parseInt(p.qtyUsed)||1;
+              partsInventory = partsInventory.map(function(ip) {
+                return ip.id===p.invPartId ? {...ip, qty:String((parseInt(ip.qty)||0)+oldQty)} : ip;
+              });
+            }
+          });
+          // Deduct new quantities
+          partsArr.forEach(function(p) {
+            if (p.invPartId) {
+              const qtyUsedNum = parseInt(p.qtyUsed)||1;
+              partsInventory = partsInventory.map(function(ip) {
+                return ip.id===p.invPartId
+                  ? {...ip, qty:String(Math.max(0,(parseInt(ip.qty)||0)-qtyUsedNum))}
+                  : ip;
+              });
+            }
+          });
+        }
+        if(modalState.target) {
+          update({...data,partsInventory,vehicles:vehicles,records:data.records.map(r=>r.id===modalState.target.id?{...modalState.target,...form}:r)});
+        } else {
+          update({...data,partsInventory,vehicles:vehicles,records:[...data.records,{id:uid(),vehicleId:selectedId,...form}]});
         }
         modalState=null; render();
       }
