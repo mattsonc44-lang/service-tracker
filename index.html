@@ -860,6 +860,7 @@
           <div class="form-group" style="flex:2"><label class="form-lbl">Part Description</label><input id="po-desc" class="form-input" placeholder="e.g. Oil filter..." /></div>
           <div class="form-group"><label class="form-lbl">Part #</label><input id="po-num" class="form-input" placeholder="e.g. 1792XE" /></div>
           <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Qty</label><input id="po-qty" class="form-input" type="number" placeholder="1" min="1" /></div>
+          <div class="form-group" style="flex:none;min-width:90px"><label class="form-lbl">Unit Cost</label><input id="po-cost" class="form-input" type="number" placeholder="$0.00" min="0" step="0.01" /></div>
           <div class="form-group" style="flex:none"><label class="form-lbl">For Vehicle</label>
             <select id="po-vehicle" class="form-select" style="min-width:140px">
               <option value="">— optional —</option>
@@ -881,6 +882,7 @@
                 <th>Part #</th>
                 <th style="text-align:center">Qty</th>
                 <th>Vehicle</th>
+                <th>Unit Cost</th>
                 <th style="text-align:center">Ordered</th>
                 <th style="text-align:center">Received</th>
                 <th style="width:40px"></th>
@@ -897,6 +899,7 @@
                     <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
                     <td style="text-align:center;font-family:'Share Tech Mono',monospace;font-weight:700">${p.qty||''}</td>
                     <td style="font-size:12px;color:var(--text-dim)">${veh?esc(veh.name):''}</td>
+                    <td><input type="number" class="form-input" style="padding:4px 8px;font-size:12px;width:90px" placeholder="$0.00" value="${p.unitCost||''}" data-action="po-cost-input" data-id="${esc(p.id)}" min="0" step="0.01" /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-received" data-id="${esc(p.id)}" ${p.received?'checked':''} /></td>
                     <td><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
@@ -1525,9 +1528,10 @@
         const num    = document.getElementById('po-num')?.value?.trim()||'';
         const vehicleId = document.getElementById('po-vehicle')?.value||'';
         const qty = document.getElementById('po-qty')?.value?.trim()||'';
+        const unitCost = document.getElementById('po-cost')?.value?.trim()||'';
         if (!desc && !num) { alert('Enter a description or part number.'); return; }
         applyDuplicateCheck(num, vendor, desc, qty, vehicleId, null, function(){
-          const newPart = {id:uid(), vendor, desc, num, qty, vehicleId, ordered:false, received:false};
+          const newPart = {id:uid(), vendor, desc, num, qty, unitCost, vehicleId, ordered:false, received:false};
           update({...data, partsToOrder:[...(data.partsToOrder||[]), newPart]});
         });
       } else if (action==='toggle-part-ordered') {
@@ -1535,14 +1539,41 @@
         update({...data, partsToOrder:parts});
       } else if (action==='toggle-part-received') {
         const orderItem = (data.partsToOrder||[]).find(p=>p.id===id);
-        const nowReceived = orderItem && !orderItem.received;
-        const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, received:!p.received, ordered:true}:p);
-        // If linked to inventory and marking received, increment qty
-        let partsInventory = data.partsInventory||[];
-        if(nowReceived && orderItem?.invPartId) {
-          partsInventory = partsInventory.map(p=>p.id===orderItem.invPartId?{...p,qty:String((parseInt(p.qty)||0)+1)}:p);
+        if (!orderItem) return;
+        const nowReceived = !orderItem.received;
+
+        if (nowReceived) {
+          // Ask for cost at receive time
+          const costInput = prompt('Enter unit cost for ' + (orderItem.desc||'this part') + ' (leave blank to skip):');
+          const unitCost = costInput !== null ? costInput.trim() : (orderItem.unitCost||'');
+          const qtyReceived = parseInt(orderItem.qty)||1;
+          // Update order item
+          const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, received:true, ordered:true, unitCost}:p);
+          // Update inventory qty on hand
+          let partsInventory = data.partsInventory||[];
+          if (orderItem.invPartId) {
+            partsInventory = partsInventory.map(p=>p.id===orderItem.invPartId
+              ? {...p, qty:String((parseInt(p.qty)||0)+qtyReceived)}
+              : p);
+          }
+          update({...data, partsToOrder:parts, partsInventory});
+        } else {
+          // Un-receiving — warn about inventory impact
+          const qtyReceived = parseInt(orderItem.qty)||1;
+          const hasInvLink = !!orderItem.invPartId;
+          const msg = 'Warning: This item has already been received.'
+            + (hasInvLink ? ' Un-receiving it will reduce your ' + (orderItem.desc||'part') + ' qty on hand by ' + qtyReceived + '.' : '')
+            + '\n\nAre you sure you want to un-receive this?';
+          if (!confirm(msg)) return;
+          const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, received:false}:p);
+          let partsInventory = data.partsInventory||[];
+          if (hasInvLink) {
+            partsInventory = partsInventory.map(p=>p.id===orderItem.invPartId
+              ? {...p, qty:String(Math.max(0,(parseInt(p.qty)||0)-qtyReceived))}
+              : p);
+          }
+          update({...data, partsToOrder:parts, partsInventory});
         }
-        update({...data, partsToOrder:parts, partsInventory});
       } else if (action==='del-part-order') {
         if(!confirm('Remove this part?'))return;
         update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>p.id!==id)});
@@ -1784,6 +1815,14 @@
         // restore focus
         const el = document.querySelector('[data-field="'+e.target.dataset.field+'"]');
         if (el) { el.focus(); el.setSelectionRange && el.setSelectionRange(el.value.length, el.value.length); }
+        return;
+      }
+      if (e.target.dataset.action === 'po-cost-input') {
+        const pid = e.target.dataset.id;
+        const val = e.target.value;
+        const parts = (data.partsToOrder||[]).map(p=>p.id===pid?{...p,unitCost:val}:p);
+        data = {...data, partsToOrder:parts};
+        saveData(data); // debounced-style: just save, no full re-render
         return;
       }
       if (e.target.id === 'inv-search') {
