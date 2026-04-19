@@ -178,6 +178,31 @@
     }
     .print-invoice { display:none; }
 
+
+    /* PARTS TO ORDER */
+    .po-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .po-table th { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border); background:#f8f9fa; position:sticky; top:0; }
+    .po-table td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .po-row-needed  { background:#fff5f5; border-left:3px solid #dc2626; }
+    .po-row-ordered { background:#fffbeb; border-left:3px solid #d97706; }
+    .po-row-received{ background:#f0fdf4; border-left:3px solid #16a34a; }
+    .po-row-needed td:first-child  { color:#dc2626; }
+    .po-row-ordered td:first-child { color:#d97706; }
+    .po-row-received td:first-child{ color:#16a34a; }
+    .po-status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; flex-shrink:0; }
+    .po-status-dot.needed   { background:#dc2626; }
+    .po-status-dot.ordered  { background:#d97706; }
+    .po-status-dot.received { background:#16a34a; }
+    .po-cb { accent-color:var(--amber); width:15px; height:15px; cursor:pointer; }
+    .po-add-bar { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px; padding:14px 16px; background:var(--panel); border:1px solid var(--border); border-radius:6px; }
+    .po-add-bar .form-group { margin:0; flex:1; min-width:120px; }
+    .po-summary { display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+    .po-stat { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:10px 16px; min-width:90px; }
+    .po-stat-val { font-family:'Share Tech Mono',monospace; font-size:20px; font-weight:700; }
+    .po-stat-lbl { font-size:11px; color:var(--text-dim); margin-top:2px; }
+    .po-stat.needed  .po-stat-val { color:#dc2626; }
+    .po-stat.ordered .po-stat-val { color:#d97706; }
+    .po-stat.received .po-stat-val { color:#16a34a; }
     /* REPORT */
     .report-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
     .report-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:140px; }
@@ -326,6 +351,7 @@
     function migrateInvoices(d) {
       if (!d.invoices) d.invoices = [];
       if (!d.settings) d.settings = {businessName: ''};
+      if (!d.partsToOrder) d.partsToOrder = [];
       return d;
     }
 
@@ -806,6 +832,76 @@
       </div>`;
     }
 
+
+    function renderPartsToOrder() {
+      const parts = data.partsToOrder || [];
+      const needed   = parts.filter(p=>!p.ordered && !p.received).length;
+      const ordered  = parts.filter(p=>p.ordered && !p.received).length;
+      const received = parts.filter(p=>p.received).length;
+
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="overview-title">Parts to Order</div>
+            <div class="overview-sub">${parts.length} item${parts.length!==1?'s':''} total</div>
+          </div>
+          ${received>0?`<button class="btn btn-ghost btn-sm" data-action="clear-received-parts">Clear Received</button>`:''}
+        </div>
+
+        <div class="po-summary">
+          <div class="po-stat needed"><div class="po-stat-val">${needed}</div><div class="po-stat-lbl">To Order</div></div>
+          <div class="po-stat ordered"><div class="po-stat-val">${ordered}</div><div class="po-stat-lbl">Ordered</div></div>
+          <div class="po-stat received"><div class="po-stat-val">${received}</div><div class="po-stat-lbl">Received</div></div>
+        </div>
+
+        <div class="po-add-bar">
+          <div class="form-group"><label class="form-lbl">Vendor</label><input id="po-vendor" class="form-input" placeholder="e.g. NAPA, Caterpillar..." /></div>
+          <div class="form-group" style="flex:2"><label class="form-lbl">Part Description</label><input id="po-desc" class="form-input" placeholder="e.g. Oil filter..." /></div>
+          <div class="form-group"><label class="form-lbl">Part #</label><input id="po-num" class="form-input" placeholder="e.g. 1792XE" /></div>
+          <div class="form-group" style="flex:none"><label class="form-lbl">For Vehicle</label>
+            <select id="po-vehicle" class="form-select" style="min-width:140px">
+              <option value="">— optional —</option>
+              <option value="__stock__">📦 For Stock</option>
+              ${(data.vehicles||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" data-action="add-part-order" style="flex-shrink:0;align-self:flex-end;margin-bottom:1px">+ Add</button>
+        </div>
+
+        ${parts.length===0
+          ? `<div class="empty"><div class="empty-icon">🔩</div><div class="empty-title">No Parts Listed</div><div style="font-size:14px">Add parts above to start tracking orders.</div></div>`
+          : `<div style="overflow-x:auto">
+            <table class="po-table">
+              <thead><tr>
+                <th style="width:28px"></th>
+                <th>Vendor</th>
+                <th>Description</th>
+                <th>Part #</th>
+                <th>Vehicle</th>
+                <th style="text-align:center">Ordered</th>
+                <th style="text-align:center">Received</th>
+                <th style="width:40px"></th>
+              </tr></thead>
+              <tbody>
+                ${parts.map(p=>{
+                  const rowClass = p.received ? 'po-row-received' : p.ordered ? 'po-row-ordered' : 'po-row-needed';
+                  const dotClass = p.received ? 'received' : p.ordered ? 'ordered' : 'needed';
+                  const veh = p.vehicleId === '__stock__' ? {name:'📦 For Stock'} : (p.vehicleId ? (data.vehicles||[]).find(v=>v.id===p.vehicleId) : null);
+                  return `<tr class="${rowClass}">
+                    <td><span class="po-status-dot ${dotClass}"></span></td>
+                    <td>${esc(p.vendor||'')}</td>
+                    <td style="font-weight:600">${esc(p.desc||'')}</td>
+                    <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
+                    <td style="font-size:12px;color:var(--text-dim)">${veh?esc(veh.name):''}</td>
+                    <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} /></td>
+                    <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-received" data-id="${esc(p.id)}" ${p.received?'checked':''} /></td>
+                    <td><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table></div>`}`;
+    }
+
     function customerModalHTML(c) {
       return `<div class="modal-overlay" id="modal-bg">
         <div class="modal">
@@ -1064,11 +1160,14 @@
           <button class="tab-btn${appView==='fleet'?' active':''}" data-action="tab-fleet">Fleet</button>
           <button class="tab-btn${appView==='report'?' active':''}" data-action="tab-report">Report</button>
           <button class="tab-btn${appView==='invoices'?' active':''}" data-action="tab-invoices">Invoices${(data.invoices||[]).length>0?' ('+( data.invoices.length)+')':''}</button>
+          <button class="tab-btn${appView==='parts'?' active':''}" data-action="tab-parts">Parts${(data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>0?' ('+( data.partsToOrder.filter(p=>!p.ordered&&!p.received).length)+')':''}</button>
         </div>
         ${appView==='report'
           ? `<div class="main"><div class="main-content">${renderReport()}</div></div>`
           : appView==='invoices'
           ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
+          : appView==='parts'
+          ? `<div class="main"><div class="main-content">${renderPartsToOrder()}</div></div>`
           : `<div class="layout">
               ${renderSidebar()}
               <div class="main"><div class="main-content">${selected?renderDetail(selected):renderOverview()}</div></div>
@@ -1210,6 +1309,28 @@
         const bizName = document.getElementById('f-biz-name').value.trim();
         update({...data,settings:{...(data.settings||{}),businessName:bizName}});
         modalState=null; render();
+      } else if (action==='tab-parts') {
+        appView='parts'; render();
+      } else if (action==='add-part-order') {
+        const vendor = document.getElementById('po-vendor')?.value?.trim()||'';
+        const desc   = document.getElementById('po-desc')?.value?.trim()||'';
+        const num    = document.getElementById('po-num')?.value?.trim()||'';
+        const vehicleId = document.getElementById('po-vehicle')?.value||'';
+        if (!desc && !num) { alert('Enter a description or part number.'); return; }
+        const newPart = {id:uid(), vendor, desc, num, vehicleId, ordered:false, received:false};
+        update({...data, partsToOrder:[...(data.partsToOrder||[]), newPart]});
+      } else if (action==='toggle-part-ordered') {
+        const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, ordered:!p.ordered}:p);
+        update({...data, partsToOrder:parts});
+      } else if (action==='toggle-part-received') {
+        const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, received:!p.received, ordered:true}:p);
+        update({...data, partsToOrder:parts});
+      } else if (action==='del-part-order') {
+        if(!confirm('Remove this part?'))return;
+        update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>p.id!==id)});
+      } else if (action==='clear-received-parts') {
+        if(!confirm('Remove all received parts from the list?'))return;
+        update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>!p.received)});
       } else if (action==='tab-invoices') {
         appView='invoices'; render();
       } else if (action==='tab-fleet') {
