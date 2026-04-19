@@ -352,6 +352,7 @@
       if (!d.invoices) d.invoices = [];
       if (!d.settings) d.settings = {businessName: ''};
       if (!d.partsToOrder) d.partsToOrder = [];
+      if (!d.partsInventory) d.partsInventory = [];
       return d;
     }
 
@@ -842,7 +843,7 @@
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
           <div>
-            <div class="overview-title">Parts to Order</div>
+            <div class="overview-title">Order Parts</div>
             <div class="overview-sub">${parts.length} item${parts.length!==1?'s':''} total</div>
           </div>
           ${received>0?`<button class="btn btn-ghost btn-sm" data-action="clear-received-parts">Clear Received</button>`:''}
@@ -900,6 +901,111 @@
                 }).join('')}
               </tbody>
             </table></div>`}`;
+    }
+
+
+    function renderPartsInventory() {
+      const inv = data.partsInventory || [];
+      const invSearch = window._invSearch || '';
+      const filtered = invSearch
+        ? inv.filter(p=>(p.name+p.num+p.vendor+p.notes).toLowerCase().includes(invSearch.toLowerCase()))
+        : inv;
+      const lowStock = inv.filter(p=>p.qty!==''&&p.minQty!==''&&Number(p.qty)<=Number(p.minQty)).length;
+
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="overview-title">Parts Inventory</div>
+            <div class="overview-sub">${inv.length} part${inv.length!==1?'s':''} on file${lowStock>0?`  ·  <span style="color:#dc2626;font-weight:600">${lowStock} low stock</span>`:''}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="inv-search" class="form-input" style="width:200px" placeholder="Search parts..." value="${esc(invSearch)}" data-action="inv-search" autocomplete="off" />
+          </div>
+        </div>
+
+        <div class="po-add-bar">
+          <div class="form-group" style="flex:2"><label class="form-lbl">Part Name *</label><input id="inv-name" class="form-input" placeholder="e.g. Oil Filter" /></div>
+          <div class="form-group"><label class="form-lbl">Part #</label><input id="inv-num" class="form-input" placeholder="e.g. 1792XE" /></div>
+          <div class="form-group"><label class="form-lbl">Vendor</label><input id="inv-vendor" class="form-input" placeholder="e.g. NAPA" /></div>
+          <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Qty</label><input id="inv-qty" class="form-input" type="number" placeholder="0" min="0" /></div>
+          <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Min Qty</label><input id="inv-minqty" class="form-input" type="number" placeholder="—" min="0" /></div>
+          <div class="form-group"><label class="form-lbl">Location</label><input id="inv-location" class="form-input" placeholder="e.g. Shop shelf B" /></div>
+          <button class="btn btn-primary" data-action="add-inv-part" style="flex-shrink:0;align-self:flex-end;margin-bottom:1px">+ Add</button>
+        </div>
+
+        ${filtered.length===0
+          ? `<div class="empty"><div class="empty-icon">📦</div><div class="empty-title">${inv.length===0?'No Parts Yet':'No Results'}</div><div style="font-size:14px">${inv.length===0?'Add parts above to build your inventory.':'Try a different search.'}</div></div>`
+          : `<div style="overflow-x:auto">
+            <table class="po-table">
+              <thead><tr>
+                <th>Part Name</th>
+                <th>Part #</th>
+                <th>Vendor</th>
+                <th style="text-align:center">Qty</th>
+                <th style="text-align:center">Min</th>
+                <th>Location</th>
+                <th>Notes</th>
+                <th style="width:80px"></th>
+              </tr></thead>
+              <tbody>
+                ${filtered.map(p=>{
+                  const low = p.qty!==''&&p.minQty!==''&&Number(p.qty)<=Number(p.minQty);
+                  const none = p.qty!==''&&Number(p.qty)===0;
+                  const rowStyle = none?'background:#fff5f5;border-left:3px solid #dc2626':low?'background:#fffbeb;border-left:3px solid #d97706':'border-left:3px solid #16a34a';
+                  return `<tr style="${rowStyle}">
+                    <td style="font-weight:600">${esc(p.name||'')}</td>
+                    <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
+                    <td style="color:var(--text-dim)">${esc(p.vendor||'')}</td>
+                    <td style="text-align:center">
+                      <div style="display:flex;align-items:center;justify-content:center;gap:4px">
+                        <button style="background:none;border:1px solid var(--border);border-radius:3px;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center" data-action="inv-qty-dec" data-id="${esc(p.id)}">−</button>
+                        <span style="font-family:'Share Tech Mono',monospace;font-size:14px;font-weight:700;min-width:24px;text-align:center;color:${none?'#dc2626':low?'#d97706':'var(--text-bright)'}">${p.qty!==''?p.qty:'—'}</span>
+                        <button style="background:none;border:1px solid var(--border);border-radius:3px;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center" data-action="inv-qty-inc" data-id="${esc(p.id)}">+</button>
+                      </div>
+                    </td>
+                    <td style="text-align:center;color:var(--text-dim)">${p.minQty!==''?p.minQty:'—'}</td>
+                    <td style="font-size:12px;color:var(--text-dim)">${esc(p.location||'')}</td>
+                    <td style="font-size:12px;color:var(--text-dim)">${esc(p.notes||'')}</td>
+                    <td style="display:flex;gap:4px;flex-wrap:wrap">
+                      ${(low||none)?((data.partsToOrder||[]).some(o=>o.invPartId===p.id&&!o.received)?'<span style="font-size:10px;font-family:\'Share Tech Mono\',monospace;color:#d97706;padding:3px 6px;background:rgba(217,119,6,.1);border-radius:3px;white-space:nowrap">On Order</span>':'<button class="btn btn-sm" style="padding:3px 8px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);color:#dc2626" data-action="inv-reorder" data-id="${esc(p.id)}">+ Order</button>'):''}
+                      <button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-inv-part" data-id="${esc(p.id)}">Edit</button>
+                      <button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-inv-part" data-id="${esc(p.id)}">✕</button>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table></div>`}`;
+    }
+
+    function invPartModalHTML(p) {
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr">
+            <div class="modal-title">${p?'Edit Part':'Add Part'}</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group form-full"><label class="form-lbl">Part Name *</label><input id="f-inv-name" class="form-input" value="${esc(p?.name||'')}" placeholder="e.g. Oil Filter" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Part #</label><input id="f-inv-num" class="form-input" value="${esc(p?.num||'')}" placeholder="e.g. 1792XE" /></div>
+              <div class="form-group"><label class="form-lbl">Vendor</label><input id="f-inv-vendor" class="form-input" value="${esc(p?.vendor||'')}" placeholder="e.g. NAPA" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Qty on Hand</label><input id="f-inv-qty" class="form-input" type="number" value="${p?.qty??''}" placeholder="0" min="0" /></div>
+              <div class="form-group"><label class="form-lbl">Min Qty Alert</label><input id="f-inv-minqty" class="form-input" type="number" value="${p?.minQty??''}" placeholder="—" min="0" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Storage Location</label><input id="f-inv-location" class="form-input" value="${esc(p?.location||'')}" placeholder="e.g. Shop shelf B, parts bin 3..." /></div>
+            <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-inv-notes" class="form-textarea" placeholder="Fits models, usage notes...">${esc(p?.notes||'')}</textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-inv-part">${p?'Save Changes':'Add Part'}</button>
+          </div>
+        </div>
+      </div>`;
     }
 
     function customerModalHTML(c) {
@@ -1140,6 +1246,7 @@
         else if (modalState.type==='invoice') modal = invoiceModalHTML(modalState.records, modalState.custId);
         else if (modalState.type==='view-invoice') modal = viewInvoiceHTML(modalState.target);
         else if (modalState.type==='settings') modal = settingsModalHTML();
+        else if (modalState.type==='inv-part') modal = invPartModalHTML(modalState.target);
       }
 
       document.getElementById('app').innerHTML = `
@@ -1160,7 +1267,8 @@
           <button class="tab-btn${appView==='fleet'?' active':''}" data-action="tab-fleet">Fleet</button>
           <button class="tab-btn${appView==='report'?' active':''}" data-action="tab-report">Report</button>
           <button class="tab-btn${appView==='invoices'?' active':''}" data-action="tab-invoices">Invoices${(data.invoices||[]).length>0?' ('+( data.invoices.length)+')':''}</button>
-          <button class="tab-btn${appView==='parts'?' active':''}" data-action="tab-parts">Parts${(data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>0?' ('+( data.partsToOrder.filter(p=>!p.ordered&&!p.received).length)+')':''}</button>
+          <button class="tab-btn${appView==='parts'?' active':''}" data-action="tab-parts">Order Parts${(data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>0?' ('+( data.partsToOrder.filter(p=>!p.ordered&&!p.received).length)+')':''}</button>
+          <button class="tab-btn${appView==='inventory'?' active':''}" data-action="tab-inventory">Parts${(data.partsInventory||[]).some(p=>p.qty!==''&&p.minQty!==''&&Number(p.qty)<=Number(p.minQty))?' ⚠':''}  </button>
         </div>
         ${appView==='report'
           ? `<div class="main"><div class="main-content">${renderReport()}</div></div>`
@@ -1168,6 +1276,8 @@
           ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
           : appView==='parts'
           ? `<div class="main"><div class="main-content">${renderPartsToOrder()}</div></div>`
+          : appView==='inventory'
+          ? `<div class="main"><div class="main-content">${renderPartsInventory()}</div></div>`
           : `<div class="layout">
               ${renderSidebar()}
               <div class="main"><div class="main-content">${selected?renderDetail(selected):renderOverview()}</div></div>
@@ -1311,6 +1421,62 @@
         modalState=null; render();
       } else if (action==='tab-parts') {
         appView='parts'; render();
+      } else if (action==='tab-inventory') {
+        appView='inventory'; render();
+      } else if (action==='inv-search') {
+        // handled by input event
+      } else if (action==='add-inv-part') {
+        const name = document.getElementById('inv-name')?.value?.trim()||'';
+        if(!name){alert('Part name is required.');return;}
+        const newP = {
+          id:uid(), name,
+          num:  document.getElementById('inv-num')?.value?.trim()||'',
+          vendor:document.getElementById('inv-vendor')?.value?.trim()||'',
+          qty:  document.getElementById('inv-qty')?.value?.trim()||'',
+          minQty:document.getElementById('inv-minqty')?.value?.trim()||'',
+          location:document.getElementById('inv-location')?.value?.trim()||'',
+          notes:'',
+        };
+        update({...data, partsInventory:[...(data.partsInventory||[]), newP]});
+      } else if (action==='inv-qty-inc') {
+        const inv = (data.partsInventory||[]).map(p=>p.id===id?{...p,qty:String(Math.max(0,(parseInt(p.qty)||0)+1))}:p);
+        update({...data, partsInventory:inv});
+      } else if (action==='inv-reorder') {
+        const p = (data.partsInventory||[]).find(p=>p.id===id);
+        if(!p) return;
+        // Check if already on order list and not received
+        const alreadyOrdered = (data.partsToOrder||[]).some(o=>o.invPartId===id&&!o.received);
+        if(alreadyOrdered){ alert('This part is already on the order list.'); return; }
+        const newOrder = {
+          id:uid(), vendor:p.vendor||'', desc:p.name, num:p.num||'',
+          vehicleId:'', invPartId:id, ordered:false, received:false
+        };
+        update({...data, partsToOrder:[...(data.partsToOrder||[]), newOrder]});
+        // Switch to Order Parts tab so they can see it
+        appView='parts'; render();
+      } else if (action==='inv-qty-dec') {
+        const inv = (data.partsInventory||[]).map(p=>p.id===id?{...p,qty:String(Math.max(0,(parseInt(p.qty)||0)-1))}:p);
+        update({...data, partsInventory:inv});
+      } else if (action==='edit-inv-part') {
+        const p=(data.partsInventory||[]).find(p=>p.id===id)||null;
+        if(p){modalState={type:'inv-part',target:p};render();}
+      } else if (action==='save-inv-part') {
+        const name=document.getElementById('f-inv-name')?.value?.trim()||'';
+        if(!name){alert('Part name is required.');return;}
+        const form={name,
+          num:document.getElementById('f-inv-num')?.value?.trim()||'',
+          vendor:document.getElementById('f-inv-vendor')?.value?.trim()||'',
+          qty:document.getElementById('f-inv-qty')?.value?.trim()||'',
+          minQty:document.getElementById('f-inv-minqty')?.value?.trim()||'',
+          location:document.getElementById('f-inv-location')?.value?.trim()||'',
+          notes:document.getElementById('f-inv-notes')?.value?.trim()||'',
+        };
+        const inv=(data.partsInventory||[]).map(p=>p.id===modalState.target?.id?{...p,...form}:p);
+        update({...data,partsInventory:inv});
+        modalState=null;render();
+      } else if (action==='del-inv-part') {
+        if(!confirm('Remove this part from inventory?'))return;
+        update({...data,partsInventory:(data.partsInventory||[]).filter(p=>p.id!==id)});
       } else if (action==='add-part-order') {
         const vendor = document.getElementById('po-vendor')?.value?.trim()||'';
         const desc   = document.getElementById('po-desc')?.value?.trim()||'';
@@ -1323,8 +1489,15 @@
         const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, ordered:!p.ordered}:p);
         update({...data, partsToOrder:parts});
       } else if (action==='toggle-part-received') {
+        const orderItem = (data.partsToOrder||[]).find(p=>p.id===id);
+        const nowReceived = orderItem && !orderItem.received;
         const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, received:!p.received, ordered:true}:p);
-        update({...data, partsToOrder:parts});
+        // If linked to inventory and marking received, increment qty
+        let partsInventory = data.partsInventory||[];
+        if(nowReceived && orderItem?.invPartId) {
+          partsInventory = partsInventory.map(p=>p.id===orderItem.invPartId?{...p,qty:String((parseInt(p.qty)||0)+1)}:p);
+        }
+        update({...data, partsToOrder:parts, partsInventory});
       } else if (action==='del-part-order') {
         if(!confirm('Remove this part?'))return;
         update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>p.id!==id)});
@@ -1540,6 +1713,13 @@
         // restore focus
         const el = document.querySelector('[data-field="'+e.target.dataset.field+'"]');
         if (el) { el.focus(); el.setSelectionRange && el.setSelectionRange(el.value.length, el.value.length); }
+        return;
+      }
+      if (e.target.id === 'inv-search') {
+        window._invSearch = e.target.value;
+        render();
+        const el = document.getElementById('inv-search');
+        if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);}
         return;
       }
       if (e.target.id === 'sidebar-search-input') {
