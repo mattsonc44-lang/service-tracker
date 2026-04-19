@@ -859,6 +859,7 @@
           <div class="form-group"><label class="form-lbl">Vendor</label><input id="po-vendor" class="form-input" placeholder="e.g. NAPA, Caterpillar..." /></div>
           <div class="form-group" style="flex:2"><label class="form-lbl">Part Description</label><input id="po-desc" class="form-input" placeholder="e.g. Oil filter..." /></div>
           <div class="form-group"><label class="form-lbl">Part #</label><input id="po-num" class="form-input" placeholder="e.g. 1792XE" /></div>
+          <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Qty</label><input id="po-qty" class="form-input" type="number" placeholder="1" min="1" /></div>
           <div class="form-group" style="flex:none"><label class="form-lbl">For Vehicle</label>
             <select id="po-vehicle" class="form-select" style="min-width:140px">
               <option value="">— optional —</option>
@@ -894,8 +895,8 @@
                     <td>${esc(p.vendor||'')}</td>
                     <td style="font-weight:600">${esc(p.desc||'')}</td>
                     <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
-                    <td style="font-size:12px;color:var(--text-dim)">${veh?esc(veh.name):''}</td>
                     <td style="text-align:center;font-family:'Share Tech Mono',monospace;font-weight:700">${p.qty||''}</td>
+                    <td style="font-size:12px;color:var(--text-dim)">${veh?esc(veh.name):''}</td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-received" data-id="${esc(p.id)}" ${p.received?'checked':''} /></td>
                     <td><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
@@ -970,7 +971,7 @@
                     <td style="font-size:12px;color:var(--text-dim)">${esc(p.location||'')}</td>
                     <td style="font-size:12px;color:var(--text-dim)">${esc(p.notes||'')}</td>
                     <td style="display:flex;gap:4px;flex-wrap:wrap">
-                      ${(low||none)?((data.partsToOrder||[]).some(o=>o.invPartId===p.id&&!o.received)?'<span style="font-size:10px;font-family:\'Share Tech Mono\',monospace;color:#d97706;padding:3px 6px;background:rgba(217,119,6,.1);border-radius:3px;white-space:nowrap">On Order</span>':'<button class="btn btn-sm" style="padding:3px 8px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);color:#dc2626" data-action="inv-reorder" data-id="${esc(p.id)}">+ Order</button>'):''}
+                      ${(low||none)?((data.partsToOrder||[]).some(o=>o.invPartId===p.id&&!o.received)?'<span style="font-size:10px;font-family:\'Share Tech Mono\',monospace;color:#d97706;padding:3px 6px;background:rgba(217,119,6,.1);border-radius:3px;white-space:nowrap">On Order</span>':'<button class="btn btn-sm" style="padding:3px 8px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);color:#dc2626" data-action="inv-reorder" data-id="'+esc(p.id)+'">+ Order</button>'):''}
                       <button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-inv-part" data-id="${esc(p.id)}">Edit</button>
                       <button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-inv-part" data-id="${esc(p.id)}">✕</button>
                     </td>
@@ -1455,7 +1456,6 @@
         };
         appView='parts';
         update({...data, partsToOrder:[...(data.partsToOrder||[]), newOrder]});
-        appView='parts'; render();
       } else if (action==='inv-qty-dec') {
         const inv = (data.partsInventory||[]).map(p=>p.id===id?{...p,qty:String(Math.max(0,(parseInt(p.qty)||0)-1))}:p);
         update({...data, partsInventory:inv});
