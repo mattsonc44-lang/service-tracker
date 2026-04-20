@@ -1682,7 +1682,23 @@
         modalState={type:'record',target:data.records.find(r=>r.id===id)||null}; render();
       } else if (action==='del-record') {
         if(!confirm('Delete this service record?'))return;
-        update({...data,records:data.records.filter(r=>r.id!==id)});
+        const recToDel = data.records.find(r=>r.id===id);
+        let partsInventory = data.partsInventory||[];
+        if (recToDel) {
+          const linkedParts = getPartsArray(recToDel).filter(p=>p.invPartId);
+          if (linkedParts.length > 0) {
+            const partNames = linkedParts.map(p=>(p.qtyUsed||1)+'x '+(p.desc||p.num||'part')).join(', ');
+            if (confirm('Return parts to inventory?\n\n' + partNames + '\n\nClick OK to return them, Cancel to discard.')) {
+              linkedParts.forEach(function(p) {
+                const qty = parseInt(p.qtyUsed)||1;
+                partsInventory = partsInventory.map(function(ip) {
+                  return ip.id===p.invPartId ? {...ip, qty:String((parseInt(ip.qty)||0)+qty)} : ip;
+                });
+              });
+            }
+          }
+        }
+        update({...data, partsInventory, records:data.records.filter(r=>r.id!==id)});
       } else if (action==='close-modal') {
         modalState=null; pendingPhoto=undefined; render();
       } else if (action==='save-vehicle') {
