@@ -236,6 +236,30 @@
     .admin-badge { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; padding:2px 8px; border-radius:10px; }
     .admin-badge.on { background:rgba(22,163,74,.1); color:#16a34a; }
     .admin-badge.off { background:rgba(107,114,128,.1); color:#6b7280; }
+
+    /* VENDORS */
+    .vendor-card { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:18px; margin-bottom:12px; }
+    .vendor-card-hdr { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .vendor-name { font-family:'Rajdhani',sans-serif; font-size:20px; font-weight:700; color:var(--text-bright); }
+    .vendor-meta { font-size:13px; color:var(--text-dim); margin-top:2px; display:flex; flex-wrap:wrap; gap:8px; }
+    .vendor-contacts { margin-top:10px; border-top:1px solid var(--border); padding-top:10px; display:flex; flex-wrap:wrap; gap:8px; }
+    .vendor-contact { background:var(--bg3); border-radius:4px; padding:6px 10px; font-size:12px; }
+    .vendor-contact-name { font-weight:600; color:var(--text-bright); }
+    .vendor-contact-phone { color:var(--text-dim); }
+    /* GLOBAL SEARCH */
+    .gs-result { background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:12px 16px; margin-bottom:8px; cursor:pointer; transition:border-color .12s; }
+    .gs-result:hover { border-color:var(--amber); }
+    .gs-source { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:6px; }
+    .gs-source.fleet { background:rgba(59,130,246,.1); color:#3b82f6; }
+    .gs-source.invoice { background:rgba(217,119,6,.1); color:#d97706; }
+    .gs-source.order { background:rgba(220,38,38,.1); color:#dc2626; }
+    .gs-source.parts { background:rgba(22,163,74,.1); color:#16a34a; }
+    .gs-source.history { background:rgba(107,114,128,.1); color:#6b7280; }
+    .gs-title { font-weight:600; font-size:14px; color:var(--text-bright); }
+    .gs-snippet { font-size:12px; color:var(--text-dim); margin-top:2px; }
+    /* ORDER HISTORY */
+    .oh-vendor-group { margin-bottom:20px; }
+    .oh-vendor-hdr { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--text-bright); padding:8px 0; border-bottom:2px solid var(--amber); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
     /* REPORT */
     .report-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
     .report-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:140px; }
@@ -392,6 +416,8 @@
       if (!d.settings.features) d.settings.features = {invoicing: true};
       if (!d.partsToOrder) d.partsToOrder = [];
       if (!d.partsInventory) d.partsInventory = [];
+      if (!d.vendors) d.vendors = [];
+      if (!d.orderHistory) d.orderHistory = [];
       return d;
     }
 
@@ -446,8 +472,11 @@
     let modalState = null;
     let pendingPhoto = undefined;
     let sidebarSearch = '';
-    let appView = 'fleet'; // fleet | report | invoices
+    let appView = 'fleet'; // fleet | report | invoices | vendors | orderhistory | globalsearch
     let selectedRecordIds = new Set();
+    let poSearch = '';
+    let ohSearch = '';
+    let globalSearch = '';
     let reportFilters = {year:'', equipment:'', partnum:'', make:'', keyword:'', customer:''};
 
 
@@ -874,8 +903,9 @@
 
 
     function renderPartsToOrder() {
-      const parts = data.partsToOrder || [];
-      const needed   = parts.filter(p=>!p.ordered && !p.received).length;
+      const allParts = data.partsToOrder || [];
+      const parts = poSearch ? allParts.filter(p=>(p.desc+p.num+p.vendor).toLowerCase().includes(poSearch.toLowerCase())) : allParts;
+      const needed   = allParts.filter(p=>!p.ordered && !p.received).length;
       const ordered  = parts.filter(p=>p.ordered && !p.received).length;
       const received = parts.filter(p=>p.received).length;
 
@@ -885,7 +915,9 @@
             <div class="overview-title">Order Parts</div>
             <div class="overview-sub">${parts.length} item${parts.length!==1?'s':''} total</div>
           </div>
-          ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}  ${received>0?`<button class="btn btn-ghost btn-sm" data-action="clear-received-parts">Clear Received</button>`:''}
+          <input class="form-input" style="width:200px" placeholder="Search order parts..." value="${esc(poSearch)}" data-action="po-search" id="po-search-inp" />
+          ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}
+          ${received>0?`<button class="btn btn-ghost btn-sm" data-action="move-to-history">Move Received to History</button>`:''}
         </div>
 
         <div class="po-summary">
@@ -895,7 +927,10 @@
         </div>
 
         <div class="po-add-bar">
-          <div class="form-group"><label class="form-lbl">Vendor</label><input id="po-vendor" class="form-input" placeholder="e.g. NAPA, Caterpillar..." /></div>
+          <div class="form-group"><label class="form-lbl">Vendor</label>
+            <input id="po-vendor" class="form-input" list="vendor-list-po" placeholder="Select or type vendor..." />
+            <datalist id="vendor-list-po">${(data.vendors||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.name)}"></option>`).join('')}</datalist>
+          </div>
           <div class="form-group" style="flex:2"><label class="form-lbl">Part Description</label><input id="po-desc" class="form-input" placeholder="e.g. Oil filter..." /></div>
           <div class="form-group"><label class="form-lbl">Part #</label><input id="po-num" class="form-input" placeholder="e.g. 1792XE" /></div>
           <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Qty</label><input id="po-qty" class="form-input" type="number" placeholder="1" min="1" /></div>
@@ -1112,6 +1147,178 @@
             </div>
           </div>
         </div>`;
+    }
+
+
+    function renderVendors() {
+      const vendors = (data.vendors||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div><div class="overview-title">Vendors</div><div class="overview-sub">${vendors.length} vendor${vendors.length!==1?'s':''}</div></div>
+          <button class="btn btn-primary" data-action="add-vendor">+ Add Vendor</button>
+        </div>
+        ${vendors.length===0
+          ? `<div class="empty"><div class="empty-icon">🏪</div><div class="empty-title">No Vendors Yet</div><div style="font-size:14px">Add vendors to pre-fill order parts quickly.</div></div>`
+          : vendors.map(v=>`
+            <div class="vendor-card">
+              <div class="vendor-card-hdr">
+                <div>
+                  <div class="vendor-name">${esc(v.name)}</div>
+                  <div class="vendor-meta">
+                    ${v.phone?`<span>📞 ${esc(v.phone)}</span>`:''}
+                    ${v.address?`<span>📍 ${esc(v.address)}</span>`:''}
+                    ${v.catalogUrl?`<a href="${esc(v.catalogUrl)}" target="_blank" style="color:var(--amber)">🔗 Parts Catalog</a>`:''}
+                  </div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button class="btn btn-ghost btn-sm" data-action="edit-vendor" data-id="${esc(v.id)}">Edit</button>
+                  <button class="btn btn-danger btn-sm" data-action="del-vendor" data-id="${esc(v.id)}">Delete</button>
+                </div>
+              </div>
+              ${v.notes?`<div style="font-size:13px;color:var(--text-dim);margin-bottom:8px">${esc(v.notes)}</div>`:''}
+              ${(v.contacts||[]).length>0?`<div class="vendor-contacts">
+                ${(v.contacts||[]).map(c=>`<div class="vendor-contact"><span class="vendor-contact-name">${esc(c.name)}</span>${c.phone?` <span class="vendor-contact-phone">· ${esc(c.phone)}</span>`:''}</div>`).join('')}
+              </div>`:''}
+            </div>`).join('')}`;
+    }
+
+    function vendorModalHTML(v) {
+      const contacts = v?.contacts||[{name:'',phone:''}];
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr">
+            <div class="modal-title">${v?'Edit Vendor':'Add Vendor'}</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group form-full"><label class="form-lbl">Vendor Name *</label><input id="f-vnd-name" class="form-input" value="${esc(v?.name||'')}" placeholder="e.g. NAPA Auto Parts" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Phone</label><input id="f-vnd-phone" class="form-input" value="${esc(v?.phone||'')}" placeholder="(406) 555-0100" /></div>
+              <div class="form-group"><label class="form-lbl">Address</label><input id="f-vnd-address" class="form-input" value="${esc(v?.address||'')}" placeholder="123 Main St, Chester MT" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Online Parts Catalog URL</label><input id="f-vnd-catalog" class="form-input" value="${esc(v?.catalogUrl||'')}" placeholder="https://..." /></div>
+            <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-vnd-notes" class="form-textarea" placeholder="Account #, hours, notes...">${esc(v?.notes||'')}</textarea></div>
+            <div style="margin-top:12px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <label class="form-lbl" style="margin:0">Contacts</label>
+                <button class="btn btn-ghost btn-sm" data-action="add-vendor-contact">+ Add Contact</button>
+              </div>
+              <div id="vnd-contacts-list">
+                ${contacts.map((c,i)=>`<div class="form-row vnd-contact-row" data-idx="${i}" style="margin-bottom:6px">
+                  <div class="form-group"><input class="form-input vnd-c-name" placeholder="Contact name" value="${esc(c.name||'')}" /></div>
+                  <div class="form-group"><input class="form-input vnd-c-phone" placeholder="Phone" value="${esc(c.phone||'')}" /></div>
+                  <button class="part-remove-btn" data-action="del-vendor-contact" data-idx="${i}" style="align-self:flex-start;margin-top:1px">✕</button>
+                </div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-vendor">${v?'Save Changes':'Add Vendor'}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+
+    function renderOrderHistory() {
+      const q = ohSearch.toLowerCase().trim();
+      let items = (data.orderHistory||[]).slice();
+      if (q) items = items.filter(p=>(p.desc+p.num+p.vendor+p.notes).toLowerCase().includes(q));
+      // Group by vendor
+      const byVendor = {};
+      items.forEach(p=>{
+        const k = p.vendor||'(No Vendor)';
+        if(!byVendor[k]) byVendor[k]=[];
+        byVendor[k].push(p);
+      });
+      const vendorKeys = Object.keys(byVendor).sort();
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div><div class="overview-title">Order History</div><div class="overview-sub">${items.length} item${items.length!==1?'s':''} received</div></div>
+          <input class="form-input" style="width:240px" placeholder="Search history..." value="${esc(ohSearch)}" data-action="oh-search" id="oh-search-inp" />
+        </div>
+        ${vendorKeys.length===0
+          ? `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">No Order History</div><div style="font-size:14px">Received orders will appear here when you move them.</div></div>`
+          : vendorKeys.map(vk=>`
+            <div class="oh-vendor-group">
+              <div class="oh-vendor-hdr">🏪 ${esc(vk)} <span style="font-size:12px;color:var(--text-dim);font-family:'Share Tech Mono',monospace">${byVendor[vk].length} item${byVendor[vk].length!==1?'s':''}</span></div>
+              <div style="overflow-x:auto"><table class="po-table">
+                <thead><tr>
+                  <th>Description</th><th>Part #</th><th>Qty</th><th>Unit Cost</th><th>Vehicle</th><th>Date Received</th>
+                </tr></thead>
+                <tbody>
+                  ${byVendor[vk].map(p=>{
+                    const veh = p.vehicleId==='__stock__'?{name:'📦 For Stock'}:(p.vehicleId?(data.vehicles||[]).find(v=>v.id===p.vehicleId):null);
+                    return `<tr style="border-left:3px solid #16a34a">
+                      <td style="font-weight:600">${esc(p.desc||'')}</td>
+                      <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
+                      <td style="text-align:center;font-family:'Share Tech Mono',monospace">${p.qty||''}</td>
+                      <td style="font-family:'Share Tech Mono',monospace;color:#16a34a">${p.unitCost?'$'+Number(p.unitCost).toFixed(2):''}</td>
+                      <td style="font-size:12px;color:var(--text-dim)">${veh?esc(veh.name):''}</td>
+                      <td style="font-size:12px;color:var(--text-dim)">${esc(p.receivedDate||'')}</td>
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table></div>
+            </div>`).join('')}`;
+    }
+
+
+    function renderGlobalSearch() {
+      const q = globalSearch.toLowerCase().trim();
+      const results = [];
+      if (q.length >= 2) {
+        // Fleet service records
+        data.records.forEach(r=>{
+          const v = (data.vehicles||[]).find(vv=>vv.id===r.vehicleId);
+          const text = [r.type,r.notes,r.partnum,(r.parts||[]).map(p=>p.desc+' '+p.num).join(' '),v?.name].join(' ').toLowerCase();
+          if (text.includes(q)) results.push({source:'fleet',label:'Service Record',title:(v?.name||'Unknown')+' · '+r.type+' · '+r.date,snippet:r.notes?.slice(0,80)||'',action:()=>{appView='fleet';selectedId=r.vehicleId;render();}});
+        });
+        // Invoices
+        (data.invoices||[]).forEach(inv=>{
+          const cust=(data.customers||[]).find(c=>c.id===inv.customerId);
+          const text=[inv.num,inv.businessName,cust?.name,(inv.lineItems||[]).map(l=>l.type+' '+l.notes).join(' ')].join(' ').toLowerCase();
+          if(text.includes(q)) results.push({source:'invoice',label:'Invoice',title:inv.num+' · '+(cust?.name||'')+' · '+inv.date,snippet:'$'+Number(inv.total||0).toFixed(2)+' · '+inv.status,action:()=>{appView='invoices';render();}});
+        });
+        // Order Parts (active)
+        (data.partsToOrder||[]).forEach(p=>{
+          const text=[p.desc,p.num,p.vendor].join(' ').toLowerCase();
+          if(text.includes(q)) results.push({source:'order',label:'Order Parts',title:(p.vendor?p.vendor+' · ':'')+p.desc,snippet:'Part# '+p.num+(p.qty?' · qty '+p.qty:'')+(p.ordered?' · Ordered':p.received?' · Received':' · Pending'),action:()=>{appView='parts';render();}});
+        });
+        // Order History
+        (data.orderHistory||[]).forEach(p=>{
+          const text=[p.desc,p.num,p.vendor].join(' ').toLowerCase();
+          if(text.includes(q)) results.push({source:'history',label:'Order History',title:(p.vendor?p.vendor+' · ':'')+p.desc,snippet:'Part# '+p.num+(p.qty?' · qty '+p.qty:'')+(p.receivedDate?' · '+p.receivedDate:''),action:()=>{appView='orderhistory';render();}});
+        });
+        // Parts inventory
+        (data.partsInventory||[]).forEach(p=>{
+          const text=[p.name,p.num,p.vendor,p.notes,p.location].join(' ').toLowerCase();
+          if(text.includes(q)) results.push({source:'parts',label:'Parts Inventory',title:p.name+(p.num?' · '+p.num:''),snippet:(p.vendor?p.vendor+' · ':'')+('qty: '+(p.qty||'—'))+(p.location?' · '+p.location:''),action:()=>{appView='inventory';render();}});
+        });
+      }
+
+      return `
+        <div style="margin-bottom:16px">
+          <div class="overview-title">Global Search</div>
+          <div class="overview-sub">Search across all fleet records, invoices, orders, and inventory.</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input id="gs-input" class="form-input" style="max-width:480px" placeholder="Search everything..." value="${esc(globalSearch)}" data-action="gs-input" autocomplete="off" />
+          ${globalSearch?`<button class="btn btn-ghost" data-action="gs-clear">Clear</button>`:''}
+        </div>
+        ${q.length<2&&globalSearch?'<div style="color:var(--text-dim);font-size:13px">Type at least 2 characters to search.</div>':''}
+        ${q.length>=2?(results.length===0
+          ? `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-title">No Results</div><div style="font-size:14px">Nothing found for "${esc(globalSearch)}".</div></div>`
+          : `<div style="margin-bottom:8px;font-size:13px;color:var(--text-dim)">${results.length} result${results.length!==1?'s':''}</div>`
+            + results.map((r,i)=>`<div class="gs-result" data-action="gs-goto" data-idx="${i}">
+              <span class="gs-source ${r.source}">${r.label}</span>
+              <div class="gs-title">${esc(r.title)}</div>
+              <div class="gs-snippet">${esc(r.snippet)}</div>
+            </div>`).join(''))
+          :''}`;
     }
 
     function customerModalHTML(c) {
@@ -1357,6 +1564,7 @@
         else if (modalState.type==='view-invoice') modal = viewInvoiceHTML(modalState.target);
         else if (modalState.type==='settings') modal = settingsModalHTML();
         else if (modalState.type==='inv-part') modal = invPartModalHTML(modalState.target);
+        else if (modalState.type==='vendor') modal = vendorModalHTML(modalState.target);
       }
 
       document.getElementById('app').innerHTML = `
@@ -1382,6 +1590,9 @@
           `<button class="tab-btn${appView==='parts'?' active':''}" data-action="tab-parts">Order Parts${(data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>0?' ('+(data.partsToOrder.filter(p=>!p.ordered&&!p.received).length)+')':''}</button>`:''}
           ${getFeature('partsInventory')?
           `<button class="tab-btn${appView==='inventory'?' active':''}" data-action="tab-inventory">Parts${(data.partsInventory||[]).some(p=>p.qty!==''&&p.minQty!==''&&Number(p.qty)<=Number(p.minQty))?'\u26a0':''}</button>`:''}
+          <button class="tab-btn${appView==='vendors'?' active':''}" data-action="tab-vendors">Vendors</button>
+          <button class="tab-btn${appView==='orderhistory'?' active':''}" data-action="tab-orderhistory">Order History</button>
+          <button class="tab-btn${appView==='globalsearch'?' active':''}" data-action="tab-globalsearch">🔍 Search</button>
           <button class="tab-btn${appView==='admin'?' active':''}" data-action="tab-admin">⚙ Admin</button>
         </div>
         ${appView==='report'
@@ -1390,6 +1601,12 @@
           ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
           : appView==='parts'
           ? `<div class="main"><div class="main-content">${renderPartsToOrder()}</div></div>`
+          : appView==='vendors'
+          ? `<div class="main"><div class="main-content">${renderVendors()}</div></div>`
+          : appView==='orderhistory'
+          ? `<div class="main"><div class="main-content">${renderOrderHistory()}</div></div>`
+          : appView==='globalsearch'
+          ? `<div class="main"><div class="main-content">${renderGlobalSearch()}</div></div>`
           : appView==='admin'
           ? `<div class="main"><div class="main-content">${renderAdmin()}</div></div>`
           : appView==='inventory'
@@ -1575,6 +1792,66 @@
         const bizName = document.getElementById('f-biz-name').value.trim();
         update({...data,settings:{...(data.settings||{}),businessName:bizName}});
         modalState=null; render();
+      } else if (action==='tab-vendors') {
+        appView='vendors'; render();
+      } else if (action==='tab-orderhistory') {
+        appView='orderhistory'; render();
+      } else if (action==='tab-globalsearch') {
+        appView='globalsearch'; render();
+      } else if (action==='gs-clear') {
+        globalSearch=''; appView='globalsearch'; render();
+      } else if (action==='gs-goto') {
+        // rebuild results to find correct entry
+        const q=globalSearch.toLowerCase().trim();
+        const results=[];
+        data.records.forEach(r=>{const v=(data.vehicles||[]).find(vv=>vv.id===r.vehicleId);const text=[r.type,r.notes,r.partnum,(r.parts||[]).map(p=>p.desc+' '+p.num).join(' '),v?.name].join(' ').toLowerCase();if(text.includes(q))results.push(()=>{appView='fleet';selectedId=r.vehicleId;render();});});
+        (data.invoices||[]).forEach(inv=>{const cust=(data.customers||[]).find(c=>c.id===inv.customerId);const text=[inv.num,inv.businessName,cust?.name,(inv.lineItems||[]).map(l=>l.type+' '+l.notes).join(' ')].join(' ').toLowerCase();if(text.includes(q))results.push(()=>{appView='invoices';render();});});
+        (data.partsToOrder||[]).forEach(p=>{const text=[p.desc,p.num,p.vendor].join(' ').toLowerCase();if(text.includes(q))results.push(()=>{appView='parts';render();});});
+        (data.orderHistory||[]).forEach(p=>{const text=[p.desc,p.num,p.vendor].join(' ').toLowerCase();if(text.includes(q))results.push(()=>{appView='orderhistory';render();});});
+        (data.partsInventory||[]).forEach(p=>{const text=[p.name,p.num,p.vendor,p.notes,p.location].join(' ').toLowerCase();if(text.includes(q))results.push(()=>{appView='inventory';render();});});
+        const idx=parseInt(el.dataset.idx)||0;
+        if(results[idx]) results[idx]();
+      } else if (action==='add-vendor') {
+        modalState={type:'vendor',target:null}; render();
+      } else if (action==='edit-vendor') {
+        const v=(data.vendors||[]).find(v=>v.id===id)||null;
+        if(v){modalState={type:'vendor',target:v};render();}
+      } else if (action==='del-vendor') {
+        if(!confirm('Delete this vendor?'))return;
+        update({...data,vendors:(data.vendors||[]).filter(v=>v.id!==id)});
+      } else if (action==='save-vendor') {
+        const name=document.getElementById('f-vnd-name')?.value?.trim()||'';
+        if(!name){alert('Vendor name required.');return;}
+        const contacts=[];
+        document.querySelectorAll('.vnd-contact-row').forEach(function(row){
+          const n=row.querySelector('.vnd-c-name')?.value?.trim()||'';
+          const ph=row.querySelector('.vnd-c-phone')?.value?.trim()||'';
+          if(n||ph) contacts.push({name:n,phone:ph});
+        });
+        const vnd={id:modalState.target?.id||uid(),name,
+          phone:document.getElementById('f-vnd-phone')?.value?.trim()||'',
+          address:document.getElementById('f-vnd-address')?.value?.trim()||'',
+          catalogUrl:document.getElementById('f-vnd-catalog')?.value?.trim()||'',
+          notes:document.getElementById('f-vnd-notes')?.value?.trim()||'',
+          contacts
+        };
+        const vendors=modalState.target
+          ?(data.vendors||[]).map(v=>v.id===vnd.id?vnd:v)
+          :[...(data.vendors||[]),vnd];
+        update({...data,vendors});
+        modalState=null; render();
+      } else if (action==='add-vendor-contact') {
+        const list=document.getElementById('vnd-contacts-list');
+        if(!list)return;
+        const idx=list.querySelectorAll('.vnd-contact-row').length;
+        const div=document.createElement('div');
+        div.className='form-row vnd-contact-row'; div.dataset.idx=idx; div.style.marginBottom='6px';
+        div.innerHTML='<div class="form-group"><input class="form-input vnd-c-name" placeholder="Contact name" /></div><div class="form-group"><input class="form-input vnd-c-phone" placeholder="Phone" /></div><button class="part-remove-btn" data-action="del-vendor-contact" data-idx="'+idx+'">✕</button>';
+        list.appendChild(div);
+      } else if (action==='del-vendor-contact') {
+        el.closest('.vnd-contact-row')?.remove();
+      } else if (action==='po-search') {
+        poSearch=el.value; render();
       } else if (action==='tab-parts') {
         appView='parts'; render();
       } else if (action==='tab-inventory') {
@@ -1665,6 +1942,15 @@
             partsInventory = partsInventory.map(p=>p.id===orderItem.invPartId
               ? {...p, qty:String((parseInt(p.qty)||0)+qtyReceived)}
               : p);
+          } else {
+            // Ask if they want to add to inventory
+            if (confirm('Add "'+(orderItem.desc||orderItem.num||'this part')+'" to Parts Inventory?')) {
+              partsInventory = [...partsInventory, {
+                id:uid(), name:orderItem.desc||'', num:orderItem.num||'',
+                vendor:orderItem.vendor||'', qty:String(qtyReceived),
+                minQty:'', location:'', notes:'', unitCost
+              }];
+            }
           }
           update({...data, partsToOrder:parts, partsInventory});
         } else {
@@ -1713,9 +1999,16 @@
         if(confirm('Consolidate '+total+' duplicate line'+(total!==1?'s':'')+' by part number?')){
           update({...data, partsToOrder:[...merged,...ordered]});
         }
-      } else if (action==='clear-received-parts') {
-        if(!confirm('Remove all received parts from the list?'))return;
-        update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>!p.received)});
+      } else if (action==='move-to-history') {
+        const receivedItems = (data.partsToOrder||[]).filter(p=>p.received);
+        if(receivedItems.length===0) return;
+        const today = new Date().toISOString().slice(0,10);
+        const histItems = receivedItems.map(p=>({...p, receivedDate:p.receivedDate||today}));
+        update({...data,
+          partsToOrder:(data.partsToOrder||[]).filter(p=>!p.received),
+          orderHistory:[...(data.orderHistory||[]), ...histItems]
+        });
+        appView='orderhistory'; render();
       } else if (action==='tab-admin') {
         appView='admin'; render();
       } else if (action==='toggle-feature') {
@@ -2012,6 +2305,9 @@
         saveData(data); // debounced-style: just save, no full re-render
         return;
       }
+      if (e.target.dataset.action === 'po-search') { poSearch=e.target.value; render(); const el=document.getElementById('po-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
+      if (e.target.dataset.action === 'oh-search') { ohSearch=e.target.value; render(); const el=document.getElementById('oh-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
+      if (e.target.dataset.action === 'gs-input') { globalSearch=e.target.value; render(); const el=document.getElementById('gs-input'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
       if (e.target.classList && e.target.classList.contains('part-desc-input')) {
         showPartDropdown(e.target);
         return;
