@@ -931,8 +931,14 @@
             <input id="po-vendor" class="form-input" list="vendor-list-po" placeholder="Select or type vendor..." />
             <datalist id="vendor-list-po">${(data.vendors||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.name)}"></option>`).join('')}</datalist>
           </div>
-          <div class="form-group" style="flex:2"><label class="form-lbl">Part Description</label><input id="po-desc" class="form-input" placeholder="e.g. Oil filter..." /></div>
-          <div class="form-group"><label class="form-lbl">Part #</label><input id="po-num" class="form-input" placeholder="e.g. 1792XE" /></div>
+          <div class="form-group" style="flex:2"><label class="form-lbl">Part Description</label>
+            <input id="po-desc" class="form-input" list="inv-desc-list-po" placeholder="e.g. Oil filter..." autocomplete="off" />
+            <datalist id="inv-desc-list-po">${(data.partsInventory||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${esc(p.name)}"></option>`).join('')}</datalist>
+          </div>
+          <div class="form-group"><label class="form-lbl">Part #</label>
+            <input id="po-num" class="form-input" list="inv-num-list-po" placeholder="e.g. 1792XE" autocomplete="off" />
+            <datalist id="inv-num-list-po">${(data.partsInventory||[]).filter(p=>p.num).sort((a,b)=>a.num.localeCompare(b.num)).map(p=>`<option value="${esc(p.num)}">${esc(p.name)}</option>`).join('')}</datalist>
+          </div>
           <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Qty</label><input id="po-qty" class="form-input" type="number" placeholder="1" min="1" /></div>
           <div class="form-group" style="flex:none;min-width:90px"><label class="form-lbl">Unit Cost</label><input id="po-cost" class="form-input" type="number" placeholder="$0.00" min="0" step="0.01" /></div>
           <div class="form-group" style="flex:none"><label class="form-lbl">For Vehicle</label>
@@ -976,7 +982,7 @@
                     <td><input type="number" class="form-input" style="padding:4px 8px;font-size:12px;width:90px" placeholder="$0.00" value="${p.unitCost||''}" data-action="po-cost-input" data-id="${esc(p.id)}" min="0" step="0.01" /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-received" data-id="${esc(p.id)}" ${p.received?'checked':''} /></td>
-                    <td><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
+                    <td style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-part-order" data-id="${esc(p.id)}">Edit</button><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
                   </tr>`;
                 }).join('')}
               </tbody>
@@ -1321,6 +1327,49 @@
           :''}`;
     }
 
+
+    function editOrderPartModalHTML(p) {
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr">
+            <div class="modal-title">Edit Order Item</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Vendor</label>
+                <input id="f-po-vendor" class="form-input" list="f-po-vendor-list" value="${esc(p.vendor||'')}" placeholder="Vendor..." />
+                <datalist id="f-po-vendor-list">${(data.vendors||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.name)}"></option>`).join('')}</datalist>
+              </div>
+              <div class="form-group" style="flex:2"><label class="form-lbl">Description</label>
+                <input id="f-po-desc" class="form-input" list="f-po-desc-list" value="${esc(p.desc||'')}" placeholder="Part description..." autocomplete="off" />
+                <datalist id="f-po-desc-list">${(data.partsInventory||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(inv=>`<option value="${esc(inv.name)}"></option>`).join('')}</datalist>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Part #</label>
+                <input id="f-po-num" class="form-input" list="f-po-num-list" value="${esc(p.num||'')}" placeholder="Part #..." autocomplete="off" />
+                <datalist id="f-po-num-list">${(data.partsInventory||[]).filter(inv=>inv.num).sort((a,b)=>a.num.localeCompare(b.num)).map(inv=>`<option value="${esc(inv.num)}">${esc(inv.name)}</option>`).join('')}</datalist>
+              </div>
+              <div class="form-group"><label class="form-lbl">Qty</label><input id="f-po-qty" class="form-input" type="number" value="${esc(p.qty||'')}" placeholder="1" min="1" /></div>
+              <div class="form-group"><label class="form-lbl">Unit Cost</label><input id="f-po-cost" class="form-input" type="number" value="${esc(p.unitCost||'')}" placeholder="$0.00" min="0" step="0.01" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">For Vehicle</label>
+              <select id="f-po-vehicle" class="form-select">
+                <option value="">— optional —</option>
+                <option value="__stock__" ${p.vehicleId==='__stock__'?'selected':''}>📦 For Stock</option>
+                ${(data.vehicles||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.id)}" ${p.vehicleId===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-part-order">Save Changes</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
     function customerModalHTML(c) {
       return `<div class="modal-overlay" id="modal-bg">
         <div class="modal">
@@ -1565,6 +1614,7 @@
         else if (modalState.type==='settings') modal = settingsModalHTML();
         else if (modalState.type==='inv-part') modal = invPartModalHTML(modalState.target);
         else if (modalState.type==='vendor') modal = vendorModalHTML(modalState.target);
+        else if (modalState.type==='edit-order-part') modal = editOrderPartModalHTML(modalState.target);
       }
 
       document.getElementById('app').innerHTML = `
@@ -1970,6 +2020,20 @@
           }
           update({...data, partsToOrder:parts, partsInventory});
         }
+      } else if (action==='edit-part-order') {
+        const p=(data.partsToOrder||[]).find(p=>p.id===id)||null;
+        if(p){modalState={type:'edit-order-part',target:p};render();}
+      } else if (action==='save-part-order') {
+        const updated={...modalState.target,
+          vendor:document.getElementById('f-po-vendor')?.value?.trim()||'',
+          desc:document.getElementById('f-po-desc')?.value?.trim()||'',
+          num:document.getElementById('f-po-num')?.value?.trim()||'',
+          qty:document.getElementById('f-po-qty')?.value?.trim()||'',
+          unitCost:document.getElementById('f-po-cost')?.value?.trim()||'',
+          vehicleId:document.getElementById('f-po-vehicle')?.value||'',
+        };
+        update({...data,partsToOrder:(data.partsToOrder||[]).map(p=>p.id===updated.id?updated:p)});
+        modalState=null; render();
       } else if (action==='del-part-order') {
         if(!confirm('Remove this part?'))return;
         update({...data, partsToOrder:(data.partsToOrder||[]).filter(p=>p.id!==id)});
