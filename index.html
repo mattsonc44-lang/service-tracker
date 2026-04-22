@@ -717,6 +717,13 @@
       return `
         <div class="vic">
           ${photo ? `<img class="vic-photo-banner" src="${photo}" alt="${esc(v.name)}" />` : `<div class="vic-photo-placeholder">${ICONS[v.type]||'🔧'}</div>`}
+          ${(v.year||v.make||v.model||v.engine||v.hp) ? `<div style="display:flex;flex-wrap:wrap;gap:0;border-bottom:1px solid var(--border)">
+            ${v.year?`<div style="padding:8px 16px;border-right:1px solid var(--border)"><div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px">Year</div><div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--text-bright)">${esc(v.year)}</div></div>`:''}
+            ${v.make?`<div style="padding:8px 16px;border-right:1px solid var(--border)"><div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px">Make</div><div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--text-bright)">${esc(v.make)}</div></div>`:''}
+            ${v.model?`<div style="padding:8px 16px;border-right:1px solid var(--border)"><div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px">Model</div><div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--text-bright)">${esc(v.model)}</div></div>`:''}
+            ${v.engine?`<div style="padding:8px 16px;border-right:1px solid var(--border);flex:1"><div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px">Engine</div><div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--text-bright)">${esc(v.engine)}</div></div>`:''}
+            ${v.hp?`<div style="padding:8px 16px"><div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:2px">HP</div><div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--text-bright)">${esc(String(v.hp))}</div></div>`:''}
+          </div>` : ''}
           <div class="vic-top">
             <div class="vic-identity">
               <div class="vic-icon-wrap">${photo ? `<img src="${photo}" alt="" />` : (ICONS[v.type]||'🔧')}</div>
