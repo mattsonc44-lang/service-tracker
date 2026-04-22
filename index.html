@@ -666,6 +666,8 @@
         v.make&&`<div class="vic-spec"><div class="vic-spec-lbl">Make</div><div class="vic-spec-val">${esc(v.make)}</div></div>`,
         v.model&&`<div class="vic-spec"><div class="vic-spec-lbl">Model</div><div class="vic-spec-val">${esc(v.model)}</div></div>`,
         v.hours&&`<div class="vic-spec"><div class="vic-spec-lbl">Hrs / Miles</div><div class="vic-spec-val">${Number(v.hours).toLocaleString()}</div></div>`,
+        v.engine&&`<div class="vic-spec"><div class="vic-spec-lbl">Engine</div><div class="vic-spec-val">${esc(v.engine)}</div></div>`,
+        v.hp&&`<div class="vic-spec"><div class="vic-spec-lbl">Horsepower</div><div class="vic-spec-val">${esc(String(v.hp))} hp</div></div>`,
         v.vin&&`<div class="vic-spec"><div class="vic-spec-lbl">VIN / Serial</div><div class="vic-spec-val" style="font-size:12px">${esc(v.vin)}</div></div>`,
         `<div class="vic-spec"><div class="vic-spec-lbl">Records</div><div class="vic-spec-val">${recs.length}</div></div>`,
         `<div class="vic-spec"><div class="vic-spec-lbl">Total Cost</div><div class="vic-spec-val" style="color:var(--green)">$${sumCost(recs).toLocaleString()}</div></div>`,
@@ -1404,6 +1406,8 @@
               <div class="form-group"><label class="form-lbl">Year</label><input id="f-year" class="form-input" value="${esc(v?.year||'')}" placeholder="2021" /></div>
               <div class="form-group"><label class="form-lbl">Make</label><input id="f-make" class="form-input" value="${esc(v?.make||'')}" placeholder="John Deere" /></div>
               <div class="form-group"><label class="form-lbl">Model</label><input id="f-model" class="form-input" value="${esc(v?.model||'')}" placeholder="9620R" /></div>
+              <div class="form-group"><label class="form-lbl">Engine</label><input id="f-engine" class="form-input" value="${esc(v?.engine||'')}" placeholder="e.g. Cummins QSB 6.7" /></div>
+              <div class="form-group"><label class="form-lbl">Horsepower</label><input id="f-hp" class="form-input" type="number" value="${esc(String(v?.hp||''))}" placeholder="e.g. 300" /></div>
               <div class="form-group"><label class="form-lbl">VIN / Serial</label><input id="f-vin" class="form-input" value="${esc(v?.vin||'')}" placeholder="Optional" /></div>
               <div class="form-group"><label class="form-lbl">Current Hours / Miles</label><input id="f-hours" type="number" class="form-input" value="${esc(v?.hours||'')}" placeholder="0" /></div>
               <div class="form-group form-full"><label class="form-lbl">Notes</label><textarea id="f-notes" class="form-textarea" placeholder="Additional notes...">${esc(v?.notes||'')}</textarea></div>
@@ -2171,6 +2175,8 @@
           year:document.getElementById('f-year').value,
           make:document.getElementById('f-make').value,
           model:document.getElementById('f-model').value,
+          engine:document.getElementById('f-engine')?.value?.trim()||'',
+          hp:document.getElementById('f-hp')?.value?.trim()||'',
           vin:document.getElementById('f-vin').value,
           hours:document.getElementById('f-hours').value,
           notes:document.getElementById('f-notes').value,
