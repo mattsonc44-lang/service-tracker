@@ -947,23 +947,23 @@
             ${received>0?`<button class="btn btn-ghost btn-sm" data-action="move-to-history">Move Received to History</button>`:''}
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:6px">
-          <div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:6px;align-items:flex-end">
+          <div style="min-width:160px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Keyword</label>
             <input id="po-q" class="form-input" style="padding:6px 8px" placeholder="Search all..." value="${esc(pf.q)}" data-action="po-filter" data-field="q" autocomplete="off" />
           </div>
-          <div>
+          <div style="min-width:140px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Vendor</label>
             <select id="po-fvendor" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="vendor">
               <option value="">All Vendors</option>
               ${vendors.map(v=>`<option value="${esc(v)}" ${pf.vendor===v?'selected':''}>${esc(v)}</option>`).join('')}
             </select>
           </div>
-          <div>
+          <div style="min-width:120px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Part #</label>
             <input id="po-fnum" class="form-input" style="padding:6px 8px" placeholder="Filter by part#..." value="${esc(pf.num)}" data-action="po-filter" data-field="num" autocomplete="off" />
           </div>
-          <div>
+          <div style="min-width:120px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Status</label>
             <select id="po-fstatus" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="status">
               <option value="">All Status</option>
@@ -972,7 +972,7 @@
               <option value="received" ${pf.status==='received'?'selected':''}>Received</option>
             </select>
           </div>
-          <div>
+          <div style="min-width:160px;flex:2">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Vehicle</label>
             <select id="po-fvehicle" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="vehicle">
               <option value="">All Vehicles</option>
