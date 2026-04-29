@@ -2481,19 +2481,19 @@
 
 
     // Parts inventory search for service record modal
-    document.getElementById('app').addEventListener('focusin', function(e) {
+    document.getElementById('app').addEventListener('click', function(e) {
       if (!e.target.classList.contains('part-desc-input')) return;
       showPartDropdown(e.target);
     });
 
-    document.getElementById('app').addEventListener('focusout', function(e) {
+    document.getElementById('app').addEventListener('blur', function(e) {
       if (!e.target.classList.contains('part-desc-input')) return;
-      // Delay so click on option registers first
       setTimeout(function() {
         const wrap = e.target.closest('.part-inv-wrap');
         if (wrap) { const dd = wrap.querySelector('.part-inv-dropdown'); if(dd) dd.style.display='none'; }
-      }, 180);
-    });
+      }, 200);
+    }, true);
+
 
     function showPartDropdown(input) {
       const wrap = input.closest('.part-inv-wrap');
