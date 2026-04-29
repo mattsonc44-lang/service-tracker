@@ -2008,7 +2008,6 @@
 
         (inv.lineItems||[]).forEach(li => {
           const amt = Number(li.cost||0).toFixed(2);
-          if (!amt || amt==='0.00') return;
           // Build rich description: Vehicle · Service Type · Notes
           const veh = clean(li.vehicleName||'');
           const svcType = clean(li.type||'');
@@ -2060,7 +2059,6 @@
         };
 
         (inv.lineItems||[]).forEach(li => {
-          if (!li.cost) return;
           // Rich description: Vehicle · Service Type · Notes
           const parts = [li.vehicleName, li.type, li.notes].filter(Boolean);
           const desc = parts.join(' · ').slice(0, 150);
