@@ -1532,7 +1532,6 @@
                       <div class="part-entry" data-part-idx="${i}" data-inv-id="${p.invPartId||''}">
                         <div class="part-inv-wrap">
                           <input class="part-desc-input" placeholder="Search inventory or type new..." value="${esc(p.desc||'')}" autocomplete="off" />
-                          <div class="part-inv-dropdown" style="display:none"></div>
                         </div>
                         <input class="part-num-input" placeholder="Part #" value="${esc(p.num||'')}" />
                         <input class="part-qty-input" type="number" placeholder="Qty" value="${p.qtyUsed||'1'}" min="1" style="width:100%" />
@@ -1541,7 +1540,8 @@
                       </div>`).join('');
                   })()}
                 </div>
-                <button class="add-part-btn" data-action="add-part" style="width:100%;margin-top:6px">+ Add Another Part</button>
+                <datalist id="inv-parts-dl">${(data.partsInventory||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${esc(p.name)}"></option>`).join('')}</datalist>
+            <button class="add-part-btn" data-action="add-part" style="width:100%;margin-top:6px">+ Add Another Part</button>
               </div>
               <div class="form-group form-full"><label class="form-lbl">Notes / Parts Used</label><textarea id="f-notes" class="form-textarea" placeholder="Work done, parts replaced...">${esc(r?.notes||'')}</textarea></div>
             </div>
@@ -2198,7 +2198,7 @@
         const div = document.createElement('div');
         div.className = 'part-entry';
         div.dataset.partIdx = idx;
-        div.innerHTML = '<div class="part-inv-wrap"><input class="part-desc-input" placeholder="Search inventory or type new..." autocomplete="off" /><div class="part-inv-dropdown" style="display:none"></div></div><input class="part-num-input" placeholder="Part #" /><input class="part-cost-input" type="number" placeholder="Cost $" style="width:100%" /><button class="part-remove-btn" data-action="remove-part" data-idx="'+idx+'">✕</button>';
+        div.innerHTML = '<div class="part-inv-wrap"><input class="part-desc-input" placeholder="Description..." list="inv-parts-dl" autocomplete="off" /></div><input class="part-num-input" placeholder="Part #" /><input class="part-cost-input" type="number" placeholder="Cost $" style="width:100%" /><button class="part-remove-btn" data-action="remove-part" data-idx="'+idx+'">✕</button>';
         list.appendChild(div);
       } else if (action==='remove-part') {
         const entry = el.closest('.part-entry');
@@ -2210,7 +2210,7 @@
             const div = document.createElement('div');
             div.className = 'part-entry';
             div.dataset.partIdx = 0;
-            div.innerHTML = '<div class="part-inv-wrap"><input class="part-desc-input" placeholder="Search inventory or type new..." autocomplete="off" /><div class="part-inv-dropdown" style="display:none"></div></div><input class="part-num-input" placeholder="Part #" /><input class="part-cost-input" type="number" placeholder="Cost $" style="width:100%" /><button class="part-remove-btn" data-action="remove-part" data-idx="0">✕</button>';
+            div.innerHTML = '<div class="part-inv-wrap"><input class="part-desc-input" placeholder="Description..." list="inv-parts-dl" autocomplete="off" /></div><input class="part-num-input" placeholder="Part #" /><input class="part-cost-input" type="number" placeholder="Cost $" style="width:100%" /><button class="part-remove-btn" data-action="remove-part" data-idx="0">✕</button>';
             list.appendChild(div);
           }
         }
@@ -2459,10 +2459,6 @@
       }
       if (e.target.dataset.action === 'oh-search') { ohSearch=e.target.value; render(); const el=document.getElementById('oh-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
       if (e.target.dataset.action === 'gs-input') { globalSearch=e.target.value; render(); const el=document.getElementById('gs-input'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
-      if (e.target.classList && e.target.classList.contains('part-desc-input')) {
-        showPartDropdown(e.target);
-        return;
-      }
       if (e.target.id === 'inv-search') {
         window._invSearch = e.target.value;
         render();
@@ -2481,61 +2477,26 @@
 
 
     // Parts inventory search for service record modal
-    document.getElementById('app').addEventListener('click', function(e) {
-      if (!e.target.classList.contains('part-desc-input')) return;
-      showPartDropdown(e.target);
-    });
-
-    document.getElementById('app').addEventListener('blur', function(e) {
-      if (!e.target.classList.contains('part-desc-input')) return;
-      setTimeout(function() {
-        const wrap = e.target.closest('.part-inv-wrap');
-        if (wrap) { const dd = wrap.querySelector('.part-inv-dropdown'); if(dd) dd.style.display='none'; }
-      }, 200);
-    }, true);
 
 
-    function showPartDropdown(input) {
-      const wrap = input.closest('.part-inv-wrap');
-      if (!wrap) return;
-      const dd = wrap.querySelector('.part-inv-dropdown');
-      if (!dd) return;
-      const q = input.value.trim().toLowerCase();
-      const inv = data.partsInventory || [];
-      const matches = q
-        ? inv.filter(p => (p.name||'').toLowerCase().includes(q) || (p.num||'').toLowerCase().includes(q) || (p.vendor||'').toLowerCase().includes(q))
-        : inv.slice(0, 12);
-      if (matches.length === 0) { dd.style.display='none'; return; }
-      dd.innerHTML = matches.map(p => {
-        const qty = p.qty !== '' ? parseInt(p.qty) : null;
-        const min = p.minQty !== '' ? parseInt(p.minQty) : null;
-        const qtyClass = qty === null ? '' : qty === 0 ? 'none' : (min !== null && qty <= min) ? 'low' : 'ok';
-        const qtyLabel = qty !== null ? '<span class="part-inv-opt-qty '+qtyClass+'">'+qty+' on hand</span>' : '';
-        return '<div class="part-inv-option" data-inv-id="'+esc(p.id)+'" data-name="'+esc(p.name)+'" data-num="'+esc(p.num||'')+'" data-cost="'+esc(p.unitCost||'')+'">'
-          + '<div><div class="part-inv-opt-name">'+esc(p.name)+'</div>'
-          + '<div class="part-inv-opt-meta">'+(p.vendor?esc(p.vendor)+' · ':'')+'<span class="part-inv-opt-num">'+(p.num?esc(p.num):'no part#')+'</span></div></div>'
-          + qtyLabel
-          + '</div>';
-      }).join('');
-      dd.style.display = 'block';
-    }
+;
 
-    document.getElementById('app').addEventListener('mousedown', function(e) {
-      const opt = e.target.closest('.part-inv-option');
-      if (!opt) return;
-      e.preventDefault();
-      const entry = opt.closest('.part-entry');
+
+    // Auto-fill part# and cost when user picks from inventory datalist
+    document.getElementById('app').addEventListener('input', function(e) {
+      if (!e.target.classList || !e.target.classList.contains('part-desc-input')) return;
+      const val = e.target.value.trim().toLowerCase();
+      if (!val) return;
+      const match = (data.partsInventory||[]).find(p=>(p.name||'').toLowerCase()===val);
+      if (!match) return;
+      const entry = e.target.closest('.part-entry');
       if (!entry) return;
-      const descInput = entry.querySelector('.part-desc-input');
       const numInput  = entry.querySelector('.part-num-input');
       const costInput = entry.querySelector('.part-cost-input');
-      const dd = opt.closest('.part-inv-dropdown');
-      if (descInput) descInput.value = opt.dataset.name || '';
-      if (numInput)  numInput.value  = opt.dataset.num  || '';
-      if (costInput && opt.dataset.cost) costInput.value = opt.dataset.cost;
-      entry.dataset.invId = opt.dataset.invId;
-      if (dd) dd.style.display = 'none';
-    });
+      if (numInput  && !numInput.value)  numInput.value  = match.num||'';
+      if (costInput && !costInput.value) costInput.value = match.unitCost||'';
+      entry.dataset.invId = match.id;
+    }, true);
 
     // Global photo input handler
     document.getElementById('global-photo-input').addEventListener('change', function() {
