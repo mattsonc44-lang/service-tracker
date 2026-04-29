@@ -931,7 +931,7 @@
       return `        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div>
             <div class="overview-title">Order Parts</div>
-            <div class="overview-sub">${parts.length} of ${allParts.length} item${allParts.length!==1?'s':''}${activeFilters?' · <span style="color:var(--amber-dim)">'+activeFilters+' filter'+(activeFilters!==1?'s':'')+' active</span>':''}</div>
+            <div class="overview-sub">${allParts.length} item${allParts.length!==1?'s':''}${activeFilters?' · <span style="color:var(--amber-dim)">'+activeFilters+' filter'+(activeFilters!==1?'s':'')+' active</span>':''}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             ${activeFilters?`<button class="btn btn-ghost btn-sm" data-action="po-clear-filters">Clear Filters</button>`:''}
