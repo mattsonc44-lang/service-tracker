@@ -970,10 +970,7 @@
         </div>
 
         <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:6px;align-items:flex-end">
-          <div style="min-width:160px;flex:1">
-            <label class="form-lbl" style="margin-bottom:3px;display:block">Keyword</label>
-            <input id="po-q" class="form-input" style="padding:6px 8px" placeholder="Search all..." value="${esc(pf.q)}" data-action="po-filter" data-field="q" autocomplete="off" />
-          </div>
+
           <div style="min-width:140px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Vendor</label>
             <div class="cs-wrap" data-cs="po-vendor">
@@ -1752,8 +1749,12 @@
           ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
           : appView==='parts'
           ? `<div class="main" style="display:flex;flex-direction:column">
-              <div style="padding:24px 24px 0;flex-shrink:0">${renderPartsHeader()}</div>
-              <div class="main-content" style="padding-top:12px">${renderPartsTable()}</div>
+              <div style="padding:24px 24px 0 24px;flex-shrink:0">${renderPartsHeader()}</div>
+              <div style="padding:0 24px 8px;flex-shrink:0;display:flex;align-items:center;gap:8px">
+                <input id="po-kw-input" type="text" class="form-input" style="max-width:280px" placeholder="🔍 Keyword search..." value="${esc(poFilters.q)}" autocomplete="off" />
+                ${poFilters.q?`<button class="btn btn-ghost btn-sm" onclick="poFilters.q='';render()">✕ Clear</button>`:''}
+              </div>
+              <div class="main-content" style="padding-top:8px">${renderPartsTable()}</div>
             </div>`
           : appView==='vendors'
           ? `<div class="main"><div class="main-content">${renderVendors()}</div></div>`
@@ -2386,6 +2387,22 @@
 
     render();
 
+    // Keep keyword input wired across re-renders
+    document.getElementById('app').addEventListener('input', function(e) {
+      if (e.target.id === 'po-kw-input') {
+        poFilters.q = e.target.value;
+        clearTimeout(window._kwTimer);
+        window._kwTimer = setTimeout(function() {
+          const val = document.getElementById('po-kw-input')?.value || '';
+          // Re-render only the table, not the whole page, to keep focus
+          const tableEl = document.querySelector('.main-content');
+          if (tableEl && appView === 'parts') {
+            tableEl.innerHTML = renderPartsTable();
+          }
+        }, 120);
+      }
+    });
+
     // ── Firebase real-time sync ───────────────────────────────────────────
     // Show loading screen while Firebase connects
     document.getElementById('app').insertAdjacentHTML('beforebegin',
@@ -2477,13 +2494,6 @@
         const parts = (data.partsToOrder||[]).map(p=>p.id===pid?{...p,unitCost:val}:p);
         data = {...data, partsToOrder:parts};
         saveData(data); // debounced-style: just save, no full re-render
-        return;
-      }
-      if (e.target.id==='po-q') {
-        poFilters['q']=e.target.value;
-        // Debounce re-render to avoid cursor jump
-        clearTimeout(window._poQTimer);
-        window._poQTimer = setTimeout(function(){ render(); const el=document.getElementById('po-q'); if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}}, 50);
         return;
       }
       if (e.target.dataset.action === 'oh-search') { ohSearch=e.target.value; render(); const el=document.getElementById('oh-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
