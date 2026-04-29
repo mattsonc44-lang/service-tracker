@@ -260,6 +260,15 @@
     /* ORDER HISTORY */
     .oh-vendor-group { margin-bottom:20px; }
     .oh-vendor-hdr { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; color:var(--text-bright); padding:8px 0; border-bottom:2px solid var(--amber); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+
+    /* CUSTOM SELECT - escapes overflow:auto scroll container */
+    .cs-wrap { position:relative; }
+    .cs-display { background:#fff; border:1px solid var(--border); border-radius:4px; padding:6px 28px 6px 8px; font-size:13px; color:var(--text-bright); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select:none; font-family:'Barlow',sans-serif; }
+    .cs-display::after { content:'▾'; position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--text-dim); pointer-events:none; }
+    .cs-dropdown { position:fixed; background:#fff; border:1px solid var(--border); border-radius:4px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:9999; max-height:220px; overflow-y:auto; min-width:140px; }
+    .cs-option { padding:8px 12px; font-size:13px; color:var(--text-bright); cursor:pointer; font-family:'Barlow',sans-serif; }
+    .cs-option:hover, .cs-option.active { background:rgba(217,119,6,.08); color:var(--amber-dim); }
+    .cs-option.selected { font-weight:600; color:var(--amber-dim); }
     /* REPORT */
     .report-bar { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end; }
     .report-field { display:flex; flex-direction:column; gap:5px; flex:1; min-width:140px; }
@@ -960,10 +969,13 @@
           </div>
           <div style="min-width:140px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Vendor</label>
-            <select id="po-fvendor" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="vendor">
-              <option value="">All Vendors</option>
-              ${vendors.map(v=>`<option value="${esc(v)}" ${pf.vendor===v?'selected':''}>${esc(v)}</option>`).join('')}
-            </select>
+            <div class="cs-wrap" data-cs="po-vendor">
+              <div class="cs-display" data-action="cs-open" data-cs="po-vendor">${pf.vendor||'All Vendors'}</div>
+              <div class="cs-dropdown" id="cs-po-vendor" style="display:none">
+                <div class="cs-option${!pf.vendor?' selected':''}" data-action="cs-pick" data-cs="po-vendor" data-field="vendor" data-val="">All Vendors</div>
+                ${vendors.map(v=>`<div class="cs-option${pf.vendor===v?' selected':''}" data-action="cs-pick" data-cs="po-vendor" data-field="vendor" data-val="${esc(v)}">${esc(v)}</div>`).join('')}
+              </div>
+            </div>
           </div>
           <div style="min-width:120px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Part #</label>
@@ -971,20 +983,23 @@
           </div>
           <div style="min-width:120px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Status</label>
-            <select id="po-fstatus" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="status">
-              <option value="">All Status</option>
-              <option value="needed"   ${pf.status==='needed'?'selected':''}>To Order</option>
-              <option value="ordered"  ${pf.status==='ordered'?'selected':''}>Ordered</option>
-              <option value="received" ${pf.status==='received'?'selected':''}>Received</option>
-            </select>
+            <div class="cs-wrap" data-cs="po-status">
+              <div class="cs-display" data-action="cs-open" data-cs="po-status">${{'':'All Status','needed':'To Order','ordered':'Ordered','received':'Received'}[pf.status]||'All Status'}</div>
+              <div class="cs-dropdown" id="cs-po-status" style="display:none">
+                ${[['','All Status'],['needed','To Order'],['ordered','Ordered'],['received','Received']].map(([v,l])=>`<div class="cs-option${pf.status===v?' selected':''}" data-action="cs-pick" data-cs="po-status" data-field="status" data-val="${v}">${l}</div>`).join('')}
+              </div>
+            </div>
           </div>
           <div style="min-width:160px;flex:2">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Vehicle</label>
-            <select id="po-fvehicle" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="vehicle">
-              <option value="">All Vehicles</option>
-              <option value="__stock__" ${pf.vehicle==='__stock__'?'selected':''}>📦 For Stock</option>
-              ${(data.vehicles||[]).filter(v=>allParts.some(p=>p.vehicleId===v.id)).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.id)}" ${pf.vehicle===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
-            </select>
+            <div class="cs-wrap" data-cs="po-vehicle">
+              <div class="cs-display" data-action="cs-open" data-cs="po-vehicle">${pf.vehicle===''?'All Vehicles':pf.vehicle==='__stock__'?'📦 For Stock':((data.vehicles||[]).find(v=>v.id===pf.vehicle)||{}).name||'All Vehicles'}</div>
+              <div class="cs-dropdown" id="cs-po-vehicle" style="display:none">
+                <div class="cs-option${!pf.vehicle?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="">All Vehicles</div>
+                <div class="cs-option${pf.vehicle==='__stock__'?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="__stock__">📦 For Stock</div>
+                ${(data.vehicles||[]).filter(v=>allParts.some(p=>p.vehicleId===v.id)).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<div class="cs-option${pf.vehicle===v.id?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="${esc(v.id)}">${esc(v.name)}</div>`).join('')}
+              </div>
+            </div>
           </div>
           <div style="display:flex;align-items:flex-end">
             ${activeFilters?`<button class="btn btn-ghost btn-sm" style="white-space:nowrap" data-action="po-clear-filters">✕ Clear</button>`:'<div style="width:60px"></div>'}
@@ -2422,10 +2437,6 @@
 
     // Sidebar search - use delegated input event on app
     document.getElementById('app').addEventListener('change', function(e) {
-      if (e.target.dataset.action === 'po-filter' && e.target.tagName==='SELECT') {
-        poFilters[e.target.dataset.field]=e.target.value; render();
-        return;
-      }
       if (e.target.dataset.action === 'report-filter') {
         reportFilters[e.target.dataset.field] = e.target.value;
         render();
@@ -2496,6 +2507,61 @@
       if (numInput  && !numInput.value)  numInput.value  = match.num||'';
       if (costInput && !costInput.value) costInput.value = match.unitCost||'';
       entry.dataset.invId = match.id;
+    }, true);
+
+
+    // Custom select handlers — dropdowns rendered at fixed position escape overflow:auto
+    let _csOpen = null;
+
+    function csPosition(btn) {
+      const dd = document.getElementById('cs-' + btn.dataset.cs);
+      if (!dd) return;
+      const rect = btn.getBoundingClientRect();
+      dd.style.top  = (rect.bottom + 2) + 'px';
+      dd.style.left = rect.left + 'px';
+      dd.style.minWidth = rect.width + 'px';
+      dd.style.display = 'block';
+      _csOpen = btn.dataset.cs;
+    }
+
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('[data-action="cs-open"]');
+      const pick = e.target.closest('[data-action="cs-pick"]');
+
+      if (pick) {
+        poFilters[pick.dataset.field] = pick.dataset.val;
+        const dd = document.getElementById('cs-' + pick.dataset.cs);
+        if (dd) dd.style.display = 'none';
+        _csOpen = null;
+        render();
+        return;
+      }
+
+      if (btn) {
+        const dd = document.getElementById('cs-' + btn.dataset.cs);
+        if (dd && dd.style.display !== 'none') {
+          dd.style.display = 'none';
+          _csOpen = null;
+        } else {
+          // Close any open
+          document.querySelectorAll('.cs-dropdown').forEach(d => d.style.display = 'none');
+          csPosition(btn);
+        }
+        return;
+      }
+
+      // Click outside — close all
+      if (_csOpen) {
+        document.querySelectorAll('.cs-dropdown').forEach(d => d.style.display = 'none');
+        _csOpen = null;
+      }
+    });
+
+    window.addEventListener('scroll', function() {
+      if (_csOpen) {
+        const btn = document.querySelector('[data-action="cs-open"][data-cs="'+_csOpen+'"]');
+        if (btn) csPosition(btn);
+      }
     }, true);
 
     // Global photo input handler
