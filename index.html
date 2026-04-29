@@ -958,6 +958,8 @@
         if (pf.status === 'received' && !p.received) return false;
         return true;
       });
+      const needed   = parts.filter(p=>!p.ordered && !p.received).length;
+      const ordered  = parts.filter(p=>p.ordered && !p.received).length;
       const received = parts.filter(p=>p.received).length;
       const vendors = [...new Set(allParts.map(p=>p.vendor).filter(Boolean))].sort();
       return `        <div class="po-summary" style="margin-top:0">
