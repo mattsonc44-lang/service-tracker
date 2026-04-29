@@ -1988,13 +1988,15 @@
     function exportInvoicesIIF(invoices) {
       invoices = invoices || data.invoices || [];
       const qb = data.settings?.qb || {};
-      const svcAcct  = qb.serviceAccount || 'Service';
-      const partsAcct = qb.partsAccount  || 'Parts';
-      const laborAcct = qb.laborAccount  || 'Labor';
+      const svcAcct   = qb.serviceAccount || 'Service';
+      const laborAcct = qb.laborAccount   || 'Labor';
       if (!invoices.length) { alert('No invoices to export.'); return; }
 
-      let iif = '!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO\n';
-      iif    += '!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\n';
+      const clean = s => (s||'').replace(/\t/g,' ').replace(/\n/g,' ');
+
+      // IIF header - include INVITEM and QNTY/PRICE for proper invoice line items
+      let iif = '!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO\tTOPRINT\n';
+      iif    += '!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\tINVITEM\tQNTY\tPRICE\n';
       iif    += '!ENDTRNS\n';
 
       invoices.forEach(inv => {
@@ -2002,24 +2004,31 @@
         const date = inv.date || '';
         const total = Number(inv.total||0).toFixed(2);
         const docNum = inv.num || '';
-        // Transaction header
-        iif += `TRNS\tINVOICE\t${date}\tAccounts Receivable\t${custName}\t${total}\t${docNum}\t${inv.businessName||''}\n`;
-        // Line items
+        iif += `TRNS\tINVOICE\t${date}\tAccounts Receivable\t${clean(custName)}\t${total}\t${docNum}\t${clean(inv.businessName||'')}\tY\n`;
+
         (inv.lineItems||[]).forEach(li => {
           const amt = Number(li.cost||0).toFixed(2);
           if (!amt || amt==='0.00') return;
-          iif += `SPL\tINVOICE\t${date}\t${svcAcct}\t${custName}\t-${amt}\t${(li.type||'').replace(/\t/g,' ')}\n`;
+          // Build rich description: Vehicle · Service Type · Notes
+          const veh = clean(li.vehicleName||'');
+          const svcType = clean(li.type||'');
+          const notes = clean(li.notes||'').slice(0,80);
+          const memo = [veh, svcType, notes].filter(Boolean).join(' · ');
+          iif += `SPL\tINVOICE\t${date}\t${clean(svcAcct)}\t${clean(custName)}\t-${amt}\t${memo}\t${svcType||svcAcct}\t1\t${amt}\n`;
         });
-        // Labor lines
-        (inv.laborLines||[]).forEach(l => {
+
+        (inv.laborLines||[]).filter(l=>l.total).forEach(l => {
           const amt = Number(l.total||0).toFixed(2);
-          if (!amt || amt==='0.00') return;
-          iif += `SPL\tINVOICE\t${date}\t${laborAcct}\t${custName}\t-${amt}\t${(l.desc||'Labor').replace(/\t/g,' ')}\n`;
+          const desc = clean(l.desc||'Labor');
+          const hrs = l.hrs ? `${l.hrs} hrs @ $${l.rate}/hr` : '';
+          const memo = [desc, hrs].filter(Boolean).join(' · ');
+          iif += `SPL\tINVOICE\t${date}\t${clean(laborAcct)}\t${clean(custName)}\t-${amt}\t${memo}\t${desc}\t${l.hrs||1}\t${l.rate||amt}\n`;
         });
+
         iif += 'ENDTRNS\n';
       });
       downloadFile('servicelog-invoices.iif', iif, 'text/plain');
-      alert(`Exported ${invoices.length} invoice(s).\n\nIn QuickBooks Desktop: File → Utilities → Import → IIF Files`);
+      alert(`Exported ${invoices.length} invoice(s).\n\nIn QuickBooks Desktop:\nFile → Utilities → Import → IIF Files\n\nEach line item will show the vehicle, service type, and description.`);
     }
 
     function exportInvoicesCSV(invoices) {
@@ -2052,10 +2061,14 @@
 
         (inv.lineItems||[]).forEach(li => {
           if (!li.cost) return;
-          addRow(qb.serviceAccount||'Service', li.type+(li.notes?' - '+li.notes:''), 1, li.cost);
+          // Rich description: Vehicle · Service Type · Notes
+          const parts = [li.vehicleName, li.type, li.notes].filter(Boolean);
+          const desc = parts.join(' · ').slice(0, 150);
+          addRow(qb.serviceAccount||'Service', desc, 1, li.cost);
         });
         (inv.laborLines||[]).filter(l=>l.total).forEach(l => {
-          addRow(qb.laborAccount||'Labor', l.desc||'Labor', l.hrs||1, l.hrs?l.rate:l.total);
+          const desc = [l.desc||'Labor', l.hrs?l.hrs+' hrs @ $'+l.rate+'/hr':''].filter(Boolean).join(' · ');
+          addRow(qb.laborAccount||'Labor', desc, l.hrs||1, l.hrs?l.rate:l.total);
         });
       });
 
