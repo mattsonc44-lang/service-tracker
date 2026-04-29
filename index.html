@@ -984,7 +984,6 @@
             ${activeFilters?`<button class="btn btn-ghost btn-sm" style="white-space:nowrap" data-action="po-clear-filters">✕ Clear</button>`:'<div style="width:60px"></div>'}
           </div>
         </div>
-          <input class="form-input" style="width:200px" placeholder="Search order parts..." value="${esc(poSearch)}" data-action="po-search" id="po-search-inp" />
           ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}
           ${received>0?`<button class="btn btn-ghost btn-sm" data-action="move-to-history">Move Received to History</button>`:''}
         </div>
