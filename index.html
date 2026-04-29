@@ -488,6 +488,7 @@
       if (!d.invoices) d.invoices = [];
       if (!d.settings) d.settings = {businessName: ''};
       if (!d.settings.features) d.settings.features = {invoicing: true};
+      if (!d.settings.qb) d.settings.qb = {mode:'', serviceAccount:'Service', partsAccount:'Parts', laborAccount:'Labor', taxAccount:'', connected:false};
       if (!d.partsToOrder) d.partsToOrder = [];
       if (!d.partsInventory) d.partsInventory = [];
       if (!d.vendors) d.vendors = [];
@@ -1336,6 +1337,67 @@
                   </div>`}
             </div>
           </div>
+
+          <div class="admin-section">
+            <div class="admin-section-hdr">
+              <div>
+                <div class="admin-section-title">QuickBooks Integration</div>
+                <div class="admin-section-desc">Export invoices to QuickBooks Desktop (IIF) or QuickBooks Online.</div>
+              </div>
+            </div>
+            <div class="admin-section-body">
+              <div class="admin-toggle-row">
+                <div class="admin-toggle-label">
+                  <div class="admin-toggle-name">QuickBooks Version</div>
+                  <div class="admin-toggle-hint">Choose which version of QuickBooks you use.</div>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button class="btn ${(data.settings?.qb?.mode||'')==='desktop'?'btn-primary':'btn-ghost'} btn-sm" data-action="qb-set-mode" data-mode="desktop">Desktop</button>
+                  <button class="btn ${(data.settings?.qb?.mode||'')==='online'?'btn-primary':'btn-ghost'} btn-sm" data-action="qb-set-mode" data-mode="online">Online</button>
+                  ${data.settings?.qb?.mode?'':'<span style="font-size:12px;color:var(--text-dim);align-self:center">Not configured</span>'}
+                </div>
+              </div>
+
+              ${data.settings?.qb?.mode ? `
+              <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px">Chart of Accounts Mapping</div>
+                <div class="form-row">
+                  <div class="form-group"><label class="form-lbl">Service / Labor Account</label><input id="qb-svc-acct" class="form-input" value="${esc(data.settings?.qb?.serviceAccount||'Service')}" placeholder="e.g. Service Revenue" /></div>
+                  <div class="form-group"><label class="form-lbl">Parts Account</label><input id="qb-parts-acct" class="form-input" value="${esc(data.settings?.qb?.partsAccount||'Parts')}" placeholder="e.g. Parts Sales" /></div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group"><label class="form-lbl">Labor Account</label><input id="qb-labor-acct" class="form-input" value="${esc(data.settings?.qb?.laborAccount||'Labor')}" placeholder="e.g. Labor Income" /></div>
+                  <div class="form-group"><label class="form-lbl">Tax Account (optional)</label><input id="qb-tax-acct" class="form-input" value="${esc(data.settings?.qb?.taxAccount||'')}" placeholder="e.g. Sales Tax" /></div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:4px">
+                  <button class="btn btn-primary btn-sm" data-action="qb-save-settings">Save Account Settings</button>
+                </div>
+              </div>
+
+              ${data.settings?.qb?.mode==='desktop' ? `
+              <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">QuickBooks Desktop</div>
+                <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Export invoices as an IIF file. In QuickBooks Desktop: <strong>File → Utilities → Import → IIF Files</strong></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn btn-primary btn-sm" data-action="qb-export-all-iif">Export All Invoices (IIF)</button>
+                  <button class="btn btn-ghost btn-sm" data-action="qb-export-customers-iif">Export Customer List (IIF)</button>
+                </div>
+              </div>` : `
+              <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">QuickBooks Online</div>
+                <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Export invoices as a CSV file importable via the QuickBooks Online import tool.</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn btn-primary btn-sm" data-action="qb-export-all-csv">Export All Invoices (CSV)</button>
+                  <button class="btn btn-ghost btn-sm" data-action="qb-export-customers-csv">Export Customer List (CSV)</button>
+                </div>
+                <div style="margin-top:10px;padding:10px 12px;background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.2);border-radius:4px;font-size:12px;color:#374151">
+                  <strong>To import in QBO:</strong> Go to <em>Settings → Import Data → Invoices</em> and upload the CSV.
+                  New customers in the file will be auto-created in QBO during import.
+                </div>
+              </div>`}
+              ` : ''}
+            </div>
+          </div>
         </div>`;
     }
 
@@ -1866,6 +1928,119 @@
     }
 
 
+
+    // ── QuickBooks Export Functions ───────────────────────────────────────────
+
+    function qbCustomerName(custId) {
+      const c = (data.customers||[]).find(c=>c.id===custId);
+      return c ? c.name : 'Unknown Customer';
+    }
+
+    function downloadFile(filename, content, mimeType) {
+      const blob = new Blob([content], {type: mimeType});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    function exportCustomersIIF() {
+      const customers = data.customers || [];
+      let iif = '!CUST\tNAME\tBSTREET\tBCITY\tBSTATE\tBZIP\tPHONE1\n';
+      customers.forEach(c => {
+        iif += 'CUST\t' + [c.name,'','','','','',''].join('\t') + '\n';
+      });
+      downloadFile('servicelog-customers.iif', iif, 'text/plain');
+    }
+
+    function exportCustomersCSV() {
+      const customers = data.customers || [];
+      let csv = 'Customer Name,Company,Email,Phone,Billing Address\n';
+      customers.forEach(c => {
+        csv += `"${(c.name||'').replace(/"/g,'""')}","${(c.name||'').replace(/"/g,'""')}","","","\n`;
+      });
+      downloadFile('servicelog-customers.csv', csv, 'text/csv');
+    }
+
+    function exportInvoicesIIF() {
+      const invoices = data.invoices || [];
+      const qb = data.settings?.qb || {};
+      const svcAcct  = qb.serviceAccount || 'Service';
+      const partsAcct = qb.partsAccount  || 'Parts';
+      const laborAcct = qb.laborAccount  || 'Labor';
+      if (!invoices.length) { alert('No invoices to export.'); return; }
+
+      let iif = '!TRNS\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tDOCNUM\tMEMO\n';
+      iif    += '!SPL\tTRNSTYPE\tDATE\tACCNT\tNAME\tAMOUNT\tMEMO\n';
+      iif    += '!ENDTRNS\n';
+
+      invoices.forEach(inv => {
+        const custName = qbCustomerName(inv.customerId);
+        const date = inv.date || '';
+        const total = Number(inv.total||0).toFixed(2);
+        const docNum = inv.num || '';
+        // Transaction header
+        iif += `TRNS\tINVOICE\t${date}\tAccounts Receivable\t${custName}\t${total}\t${docNum}\t${inv.businessName||''}\n`;
+        // Line items
+        (inv.lineItems||[]).forEach(li => {
+          const amt = Number(li.cost||0).toFixed(2);
+          if (!amt || amt==='0.00') return;
+          iif += `SPL\tINVOICE\t${date}\t${svcAcct}\t${custName}\t-${amt}\t${(li.type||'').replace(/\t/g,' ')}\n`;
+        });
+        // Labor lines
+        (inv.laborLines||[]).forEach(l => {
+          const amt = Number(l.total||0).toFixed(2);
+          if (!amt || amt==='0.00') return;
+          iif += `SPL\tINVOICE\t${date}\t${laborAcct}\t${custName}\t-${amt}\t${(l.desc||'Labor').replace(/\t/g,' ')}\n`;
+        });
+        iif += 'ENDTRNS\n';
+      });
+      downloadFile('servicelog-invoices.iif', iif, 'text/plain');
+      alert(`Exported ${invoices.length} invoice(s).\n\nIn QuickBooks Desktop: File → Utilities → Import → IIF Files`);
+    }
+
+    function exportInvoicesCSV() {
+      const invoices = data.invoices || [];
+      if (!invoices.length) { alert('No invoices to export.'); return; }
+
+      // QBO Invoice import format
+      const rows = [];
+      rows.push([
+        'InvoiceNo','Customer','InvoiceDate','DueDate','Item(Product/Service)',
+        'ItemDescription','ItemQuantity','ItemRate','ItemAmount','TaxCode','Terms','Location'
+      ].join(','));
+
+      invoices.forEach(inv => {
+        const custName = qbCustomerName(inv.customerId);
+        const date = inv.date||'';
+        const dueDate = date; // same day; could add 30-day terms
+        const invNum = inv.num||'';
+        const qb = data.settings?.qb || {};
+
+        const addRow = (item, desc, qty, rate) => {
+          rows.push([
+            invNum, `"${custName.replace(/"/g,'""')}"`, date, dueDate,
+            `"${item.replace(/"/g,'""')}"`,
+            `"${(desc||'').replace(/"/g,'""').slice(0,100)}"`,
+            qty, Number(rate).toFixed(2),
+            (Number(qty)*Number(rate)).toFixed(2), '', 'Net 30', ''
+          ].join(','));
+        };
+
+        (inv.lineItems||[]).forEach(li => {
+          if (!li.cost) return;
+          addRow(qb.serviceAccount||'Service', li.type+(li.notes?' - '+li.notes:''), 1, li.cost);
+        });
+        (inv.laborLines||[]).filter(l=>l.total).forEach(l => {
+          addRow(qb.laborAccount||'Labor', l.desc||'Labor', l.hrs||1, l.hrs?l.rate:l.total);
+        });
+      });
+
+      downloadFile('servicelog-invoices.csv', rows.join('\n'), 'text/csv');
+      alert(`Exported ${invoices.length} invoice(s) for ${[...new Set(invoices.map(i=>qbCustomerName(i.customerId)))].length} customer(s).\n\nIn QBO: Settings → Import Data → Invoices`);
+    }
+
     // Returns {action:'combine',match} or {action:'ask',match} or {action:'new'}
     function checkDuplicateOrder(num, vendor, desc, excludeId) {
       const list = (data.partsToOrder||[]).filter(o=>!o.ordered&&!o.received&&o.id!==excludeId);
@@ -2274,6 +2449,22 @@
           orderHistory:[...(data.orderHistory||[]), ...histItems]
         });
         appView='orderhistory'; render();
+      } else if (action==='qb-set-mode') {
+        const mode = el.dataset.mode;
+        update({...data, settings:{...data.settings, qb:{...(data.settings?.qb||{}), mode}}});
+      } else if (action==='qb-save-settings') {
+        const qb = {
+          ...(data.settings?.qb||{}),
+          serviceAccount: document.getElementById('qb-svc-acct')?.value?.trim()||'Service',
+          partsAccount:   document.getElementById('qb-parts-acct')?.value?.trim()||'Parts',
+          laborAccount:   document.getElementById('qb-labor-acct')?.value?.trim()||'Labor',
+          taxAccount:     document.getElementById('qb-tax-acct')?.value?.trim()||'',
+        };
+        update({...data, settings:{...data.settings, qb}});
+      } else if (action==='qb-export-all-iif') { exportInvoicesIIF();
+      } else if (action==='qb-export-customers-iif') { exportCustomersIIF();
+      } else if (action==='qb-export-all-csv') { exportInvoicesCSV();
+      } else if (action==='qb-export-customers-csv') { exportCustomersCSV();
       } else if (action==='tab-admin') {
         appView='admin'; render();
       } else if (action==='toggle-feature') {
