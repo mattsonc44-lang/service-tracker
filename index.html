@@ -912,7 +912,7 @@
 
 
     function renderPartsToOrder() {
-      const allParts = data.partsToOrder || [];
+      const allParts = (data.partsToOrder || []).slice().reverse();
       const parts = poSearch ? allParts.filter(p=>(p.desc+p.num+p.vendor).toLowerCase().includes(poSearch.toLowerCase())) : allParts;
       const needed   = allParts.filter(p=>!p.ordered && !p.received).length;
       const ordered  = parts.filter(p=>p.ordered && !p.received).length;
@@ -1025,7 +1025,10 @@
           <div class="form-group"><label class="form-lbl">Vendor</label><input id="inv-vendor" class="form-input" placeholder="e.g. NAPA" /></div>
           <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Qty</label><input id="inv-qty" class="form-input" type="number" placeholder="0" min="0" /></div>
           <div class="form-group" style="flex:none;min-width:70px"><label class="form-lbl">Min Qty</label><input id="inv-minqty" class="form-input" type="number" placeholder="—" min="0" /></div>
-          <div class="form-group"><label class="form-lbl">Location</label><input id="inv-location" class="form-input" placeholder="e.g. Shop shelf B" /></div>
+          <div class="form-group"><label class="form-lbl">Location</label>
+            <input id="inv-location" class="form-input" list="inv-loc-list-quick" placeholder="e.g. Shop shelf B" />
+            <datalist id="inv-loc-list-quick">${[...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))].sort().map(loc=>`<option value="${esc(loc)}"></option>`).join('')}</datalist>
+          </div>
           <button class="btn btn-primary" data-action="add-inv-part" style="flex-shrink:0;align-self:flex-end;margin-bottom:1px">+ Add</button>
         </div>
 
@@ -1092,7 +1095,10 @@
               <div class="form-group"><label class="form-lbl">Qty on Hand</label><input id="f-inv-qty" class="form-input" type="number" value="${p?.qty??''}" placeholder="0" min="0" /></div>
               <div class="form-group"><label class="form-lbl">Min Qty Alert</label><input id="f-inv-minqty" class="form-input" type="number" value="${p?.minQty??''}" placeholder="—" min="0" /></div>
             </div>
-            <div class="form-group"><label class="form-lbl">Storage Location</label><input id="f-inv-location" class="form-input" value="${esc(p?.location||'')}" placeholder="e.g. Shop shelf B, parts bin 3..." /></div>
+            <div class="form-group"><label class="form-lbl">Storage Location</label>
+              <input id="f-inv-location" class="form-input" list="inv-location-list" value="${esc(p?.location||'')}" placeholder="e.g. Shop shelf B, parts bin 3..." />
+              <datalist id="inv-location-list">${[...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))].sort().map(loc=>`<option value="${esc(loc)}"></option>`).join('')}</datalist>
+            </div>
             <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-inv-notes" class="form-textarea" placeholder="Fits models, usage notes...">${esc(p?.notes||'')}</textarea></div>
           </div>
           <div class="modal-footer">
@@ -1991,9 +1997,11 @@
         const nowReceived = !orderItem.received;
 
         if (nowReceived) {
-          // Ask for cost at receive time
-          const costInput = prompt('Enter unit cost for ' + (orderItem.desc||'this part') + ' (leave blank to skip):');
-          const unitCost = costInput !== null ? costInput.trim() : (orderItem.unitCost||'');
+          // Pre-fill cost from order, allow edit
+          const defaultCost = orderItem.unitCost||'';
+          const costInput = prompt('Receive: ' + (orderItem.desc||'this part') + '\nUnit cost' + (defaultCost?' (pre-filled from order):':':'), defaultCost);
+          if (costInput === null) return; // cancelled
+          const unitCost = costInput.trim() || defaultCost;
           const qtyReceived = parseInt(orderItem.qty)||1;
           // Update order item
           const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, received:true, ordered:true, unitCost}:p);
