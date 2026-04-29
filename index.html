@@ -920,32 +920,15 @@
     }
 
 
-    function renderPartsToOrder() {
+    function renderPartsHeader() {
       const allParts = (data.partsToOrder || []).slice().reverse();
-      // Apply filters
       const pf = poFilters;
-      const parts = allParts.filter(p=>{
-        const q = pf.q.toLowerCase();
-        if (q && !(p.desc+p.num+p.vendor+p.notes).toLowerCase().includes(q)) return false;
-        if (pf.vendor && (p.vendor||'').toLowerCase() !== pf.vendor.toLowerCase()) return false;
-        if (pf.num && !(p.num||'').toLowerCase().includes(pf.num.toLowerCase())) return false;
-        if (pf.vehicle) {
-          if (pf.vehicle === '__stock__') { if (p.vehicleId !== '__stock__') return false; }
-          else if (p.vehicleId !== pf.vehicle) return false;
-        }
-        if (pf.status === 'needed'   && (p.ordered||p.received)) return false;
-        if (pf.status === 'ordered'  && (!p.ordered||p.received)) return false;
-        if (pf.status === 'received' && !p.received) return false;
-        return true;
-      });
+      const vendors = [...new Set(allParts.map(p=>p.vendor).filter(Boolean))].sort();
+      const activeFilters = Object.values(pf).filter(Boolean).length;
       const needed   = allParts.filter(p=>!p.ordered && !p.received).length;
       const ordered  = allParts.filter(p=>p.ordered && !p.received).length;
       const received = allParts.filter(p=>p.received).length;
-      const activeFilters = Object.values(pf).filter(Boolean).length;
-      const vendors = [...new Set(allParts.map(p=>p.vendor).filter(Boolean))].sort();
-
-      return `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      return `        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div>
             <div class="overview-title">Order Parts</div>
             <div class="overview-sub">${parts.length} of ${allParts.length} item${allParts.length!==1?'s':''}${activeFilters?' · <span style="color:var(--amber-dim)">'+activeFilters+' filter'+(activeFilters!==1?'s':'')+' active</span>':''}</div>
@@ -955,8 +938,29 @@
             ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}
             ${received>0?`<button class="btn btn-ghost btn-sm" data-action="move-to-history">Move Received to History</button>`:''}
           </div>
-        </div>
-        <div class="po-summary" style="margin-top:0">
+        </div>`;
+    }
+
+    function renderPartsTable() {
+      const allParts = (data.partsToOrder || []).slice().reverse();
+      const pf = poFilters;
+      const parts = allParts.filter(p=>{
+        const q = pf.q.toLowerCase();
+        if (q && !(p.desc+p.num+p.vendor+(p.notes||'')).toLowerCase().includes(q)) return false;
+        if (pf.vendor && (p.vendor||'').toLowerCase() !== pf.vendor.toLowerCase()) return false;
+        if (pf.num && (p.num||'').toLowerCase() !== pf.num.toLowerCase()) return false;
+        if (pf.vehicle) {
+          if (pf.vehicle === '__stock__') { if (p.vehicleId !== '__stock__') return false; }
+          else if (p.vehicleId !== pf.vehicle) return false;
+        }
+        if (pf.status === 'needed'   && (p.ordered||p.received)) return false;
+        if (pf.status === 'ordered'  && (!p.ordered||p.received)) return false;
+        if (pf.status === 'received' && !p.received) return false;
+        return true;
+      });
+      const received = parts.filter(p=>p.received).length;
+      const vendors = [...new Set(allParts.map(p=>p.vendor).filter(Boolean))].sort();
+      return `        <div class="po-summary" style="margin-top:0">
           <div class="po-stat needed"><div class="po-stat-val">${needed}</div><div class="po-stat-lbl">To Order</div></div>
           <div class="po-stat ordered"><div class="po-stat-val">${ordered}</div><div class="po-stat-lbl">Ordered</div></div>
           <div class="po-stat received"><div class="po-stat-val">${received}</div><div class="po-stat-lbl">Received</div></div>
@@ -1744,7 +1748,10 @@
           : appView==='invoices'
           ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
           : appView==='parts'
-          ? `<div class="main"><div class="main-content">${renderPartsToOrder()}</div></div>`
+          ? `<div class="main" style="display:flex;flex-direction:column">
+              <div style="padding:24px 24px 0;flex-shrink:0">${renderPartsHeader()}</div>
+              <div class="main-content" style="padding-top:12px">${renderPartsTable()}</div>
+            </div>`
           : appView==='vendors'
           ? `<div class="main"><div class="main-content">${renderVendors()}</div></div>`
           : appView==='orderhistory'
