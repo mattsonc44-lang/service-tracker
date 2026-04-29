@@ -474,7 +474,7 @@
     let sidebarSearch = '';
     let appView = 'fleet'; // fleet | report | invoices | vendors | orderhistory | globalsearch
     let selectedRecordIds = new Set();
-    let poSearch = '';
+    let poFilters = {q:'', vendor:'', num:'', status:'', vehicle:''};
     let ohSearch = '';
     let globalSearch = '';
     let reportFilters = {year:'', equipment:'', partnum:'', make:'', keyword:'', customer:''};
@@ -913,17 +913,77 @@
 
     function renderPartsToOrder() {
       const allParts = (data.partsToOrder || []).slice().reverse();
-      const parts = poSearch ? allParts.filter(p=>(p.desc+p.num+p.vendor).toLowerCase().includes(poSearch.toLowerCase())) : allParts;
+      // Apply filters
+      const pf = poFilters;
+      const parts = allParts.filter(p=>{
+        const q = pf.q.toLowerCase();
+        if (q && !(p.desc+p.num+p.vendor+p.notes).toLowerCase().includes(q)) return false;
+        if (pf.vendor && (p.vendor||'').toLowerCase() !== pf.vendor.toLowerCase()) return false;
+        if (pf.num && !(p.num||'').toLowerCase().includes(pf.num.toLowerCase())) return false;
+        if (pf.vehicle) {
+          if (pf.vehicle === '__stock__') { if (p.vehicleId !== '__stock__') return false; }
+          else if (p.vehicleId !== pf.vehicle) return false;
+        }
+        if (pf.status === 'needed'   && (p.ordered||p.received)) return false;
+        if (pf.status === 'ordered'  && (!p.ordered||p.received)) return false;
+        if (pf.status === 'received' && !p.received) return false;
+        return true;
+      });
       const needed   = allParts.filter(p=>!p.ordered && !p.received).length;
-      const ordered  = parts.filter(p=>p.ordered && !p.received).length;
-      const received = parts.filter(p=>p.received).length;
+      const ordered  = allParts.filter(p=>p.ordered && !p.received).length;
+      const received = allParts.filter(p=>p.received).length;
+      const activeFilters = Object.values(pf).filter(Boolean).length;
+      const vendors = [...new Set(allParts.map(p=>p.vendor).filter(Boolean))].sort();
 
       return `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
           <div>
             <div class="overview-title">Order Parts</div>
-            <div class="overview-sub">${parts.length} item${parts.length!==1?'s':''} total</div>
+            <div class="overview-sub">${parts.length} of ${allParts.length} item${allParts.length!==1?'s':''}${activeFilters?' · <span style="color:var(--amber-dim)">'+activeFilters+' filter'+(activeFilters!==1?'s':'')+' active</span>':''}</div>
           </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            ${activeFilters?`<button class="btn btn-ghost btn-sm" data-action="po-clear-filters">Clear Filters</button>`:''}
+            ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}
+            ${received>0?`<button class="btn btn-ghost btn-sm" data-action="move-to-history">Move Received to History</button>`:''}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:6px">
+          <div>
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Keyword</label>
+            <input id="po-q" class="form-input" style="padding:6px 8px" placeholder="Search all..." value="${esc(pf.q)}" data-action="po-filter" data-field="q" autocomplete="off" />
+          </div>
+          <div>
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Vendor</label>
+            <select id="po-fvendor" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="vendor">
+              <option value="">All Vendors</option>
+              ${vendors.map(v=>`<option value="${esc(v)}" ${pf.vendor===v?'selected':''}>${esc(v)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Part #</label>
+            <input id="po-fnum" class="form-input" style="padding:6px 8px" placeholder="Filter by part#..." value="${esc(pf.num)}" data-action="po-filter" data-field="num" autocomplete="off" />
+          </div>
+          <div>
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Status</label>
+            <select id="po-fstatus" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="status">
+              <option value="">All Status</option>
+              <option value="needed"   ${pf.status==='needed'?'selected':''}>To Order</option>
+              <option value="ordered"  ${pf.status==='ordered'?'selected':''}>Ordered</option>
+              <option value="received" ${pf.status==='received'?'selected':''}>Received</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Vehicle</label>
+            <select id="po-fvehicle" class="form-select" style="padding:6px 8px" data-action="po-filter" data-field="vehicle">
+              <option value="">All Vehicles</option>
+              <option value="__stock__" ${pf.vehicle==='__stock__'?'selected':''}>📦 For Stock</option>
+              ${(data.vehicles||[]).filter(v=>allParts.some(p=>p.vehicleId===v.id)).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.id)}" ${pf.vehicle===v.id?'selected':''}>${esc(v.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            ${activeFilters?`<button class="btn btn-ghost btn-sm" style="white-space:nowrap" data-action="po-clear-filters">✕ Clear</button>`:'<div style="width:60px"></div>'}
+          </div>
+        </div>
           <input class="form-input" style="width:200px" placeholder="Search order parts..." value="${esc(poSearch)}" data-action="po-search" id="po-search-inp" />
           ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}
           ${received>0?`<button class="btn btn-ghost btn-sm" data-action="move-to-history">Move Received to History</button>`:''}
@@ -1917,8 +1977,10 @@
         list.appendChild(div);
       } else if (action==='del-vendor-contact') {
         el.closest('.vnd-contact-row')?.remove();
-      } else if (action==='po-search') {
-        poSearch=el.value; render();
+      } else if (action==='po-filter') {
+        poFilters[el.dataset.field] = el.value; render();
+      } else if (action==='po-clear-filters') {
+        poFilters={q:'',vendor:'',num:'',status:'',vehicle:''}; render();
       } else if (action==='tab-parts') {
         appView='parts'; render();
       } else if (action==='tab-inventory') {
@@ -2364,6 +2426,10 @@
 
     // Sidebar search - use delegated input event on app
     document.getElementById('app').addEventListener('change', function(e) {
+      if (e.target.dataset.action === 'po-filter' && e.target.tagName==='SELECT') {
+        poFilters[e.target.dataset.field]=e.target.value; render();
+        return;
+      }
       if (e.target.dataset.action === 'report-filter') {
         reportFilters[e.target.dataset.field] = e.target.value;
         render();
@@ -2390,7 +2456,11 @@
         saveData(data); // debounced-style: just save, no full re-render
         return;
       }
-      if (e.target.dataset.action === 'po-search') { poSearch=e.target.value; render(); const el=document.getElementById('po-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
+      if (e.target.dataset.action === 'po-filter' && (e.target.tagName==='INPUT')) {
+        poFilters[e.target.dataset.field]=e.target.value; render();
+        const focused=document.getElementById(e.target.id); if(focused){focused.focus();focused.setSelectionRange&&focused.setSelectionRange(focused.value.length,focused.value.length);}
+        return;
+      }
       if (e.target.dataset.action === 'oh-search') { ohSearch=e.target.value; render(); const el=document.getElementById('oh-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
       if (e.target.dataset.action === 'gs-input') { globalSearch=e.target.value; render(); const el=document.getElementById('gs-input'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
       if (e.target.classList && e.target.classList.contains('part-desc-input')) {
