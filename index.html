@@ -944,8 +944,6 @@
     function renderPartsTable() {
       const allParts = (data.partsToOrder || []).slice().reverse();
       const pf = poFilters;
-      const allParts = (data.partsToOrder || []).slice().reverse();
-      const pf = poFilters;
       const parts = allParts.filter(p=>{
         const q = pf.q.toLowerCase();
         if (q && !(p.desc+p.num+p.vendor+(p.notes||'')).toLowerCase().includes(q)) return false;
