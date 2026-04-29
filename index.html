@@ -2469,9 +2469,11 @@
         saveData(data); // debounced-style: just save, no full re-render
         return;
       }
-      if (e.target.dataset.action === 'po-filter' && e.target.id==='po-q') {
-        poFilters['q']=e.target.value; render();
-        const focused=document.getElementById('po-q'); if(focused){focused.focus();focused.setSelectionRange&&focused.setSelectionRange(focused.value.length,focused.value.length);}
+      if (e.target.id==='po-q') {
+        poFilters['q']=e.target.value;
+        // Debounce re-render to avoid cursor jump
+        clearTimeout(window._poQTimer);
+        window._poQTimer = setTimeout(function(){ render(); const el=document.getElementById('po-q'); if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}}, 50);
         return;
       }
       if (e.target.dataset.action === 'oh-search') { ohSearch=e.target.value; render(); const el=document.getElementById('oh-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
