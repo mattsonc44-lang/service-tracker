@@ -944,6 +944,8 @@
     function renderPartsTable() {
       const allParts = (data.partsToOrder || []).slice().reverse();
       const pf = poFilters;
+      const allParts = (data.partsToOrder || []).slice().reverse();
+      const pf = poFilters;
       const parts = allParts.filter(p=>{
         const q = pf.q.toLowerCase();
         if (q && !(p.desc+p.num+p.vendor+(p.notes||'')).toLowerCase().includes(q)) return false;
@@ -958,6 +960,7 @@
         if (pf.status === 'received' && !p.received) return false;
         return true;
       });
+      const activeFilters = Object.values(poFilters).filter(Boolean).length;
       const needed   = parts.filter(p=>!p.ordered && !p.received).length;
       const ordered  = parts.filter(p=>p.ordered && !p.received).length;
       const received = parts.filter(p=>p.received).length;
