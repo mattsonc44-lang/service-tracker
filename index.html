@@ -979,7 +979,13 @@
           </div>
           <div style="min-width:120px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Part #</label>
-            <input id="po-fnum" class="form-input" style="padding:6px 8px" placeholder="Filter by part#..." value="${esc(pf.num)}" data-action="po-filter" data-field="num" autocomplete="off" />
+            <div class="cs-wrap" data-cs="po-num">
+              <div class="cs-display" data-action="cs-open" data-cs="po-num">${pf.num||'All Part #s'}</div>
+              <div class="cs-dropdown" id="cs-po-num" style="display:none">
+                <div class="cs-option${!pf.num?' selected':''}" data-action="cs-pick" data-cs="po-num" data-field="num" data-val="">All Part #s</div>
+                ${[...new Set(allParts.map(p=>p.num).filter(Boolean))].sort().map(n=>`<div class="cs-option${pf.num===n?' selected':''}" data-action="cs-pick" data-cs="po-num" data-field="num" data-val="${esc(n)}">${esc(n)}</div>`).join('')}
+              </div>
+            </div>
           </div>
           <div style="min-width:120px;flex:1">
             <label class="form-lbl" style="margin-bottom:3px;display:block">Status</label>
@@ -2463,9 +2469,9 @@
         saveData(data); // debounced-style: just save, no full re-render
         return;
       }
-      if (e.target.dataset.action === 'po-filter' && (e.target.tagName==='INPUT')) {
-        poFilters[e.target.dataset.field]=e.target.value; render();
-        const focused=document.getElementById(e.target.id); if(focused){focused.focus();focused.setSelectionRange&&focused.setSelectionRange(focused.value.length,focused.value.length);}
+      if (e.target.dataset.action === 'po-filter' && e.target.id==='po-q') {
+        poFilters['q']=e.target.value; render();
+        const focused=document.getElementById('po-q'); if(focused){focused.focus();focused.setSelectionRange&&focused.setSelectionRange(focused.value.length,focused.value.length);}
         return;
       }
       if (e.target.dataset.action === 'oh-search') { ohSearch=e.target.value; render(); const el=document.getElementById('oh-search-inp'); if(el){el.focus();el.setSelectionRange(el.value.length,el.value.length);} return; }
