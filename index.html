@@ -1175,11 +1175,16 @@
 
     function renderPartsInventory() {
       const inv = data.partsInventory || [];
-      const invSearch = window._invSearch || '';
-      const filtered = invSearch
-        ? inv.filter(p=>(p.name+p.num+p.vendor+p.notes).toLowerCase().includes(invSearch.toLowerCase()))
-        : inv;
+      const invF = window._invFilters || {q:'',num:'',vendor:'',location:''};
+      const filtered = inv.filter(p=>{
+        if(invF.q && !(p.name+p.num+p.vendor+p.notes+p.location).toLowerCase().includes(invF.q.toLowerCase())) return false;
+        if(invF.num && !(p.num||'').toLowerCase().includes(invF.num.toLowerCase())) return false;
+        if(invF.vendor && (p.vendor||'').toLowerCase()!==(invF.vendor||'').toLowerCase()) return false;
+        if(invF.location && (p.location||'').toLowerCase()!==(invF.location||'').toLowerCase()) return false;
+        return true;
+      });
       const lowStock = inv.filter(p=>p.qty!==''&&p.minQty!==''&&Number(p.qty)<=Number(p.minQty)).length;
+      const activeInvFilters = Object.values(invF).filter(Boolean).length;
 
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
@@ -1188,12 +1193,54 @@
             <div class="overview-sub">${inv.length} part${inv.length!==1?'s':''} on file${lowStock>0?`  ·  <span style="color:#dc2626;font-weight:600">${lowStock} low stock</span>`:''}
             </div>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             ${(()=>{ const dups=[...new Set((data.partsInventory||[]).filter(p=>p.num).map(p=>p.num.trim().toLowerCase()))].filter(n=>(data.partsInventory||[]).filter(p=>(p.num||'').trim().toLowerCase()===n).length>1); return dups.length?`<button class="btn btn-ghost btn-sm" style="border-color:#d97706;color:#d97706" data-action="inv-find-dupes">⚠ ${dups.length} Duplicate Part #${dups.length>1?'s':''}</button>`:''; })()}
-            <input id="inv-search" class="form-input" style="width:200px" placeholder="Search parts..." value="${esc(invSearch)}" data-action="inv-search" autocomplete="off" />
+            ${activeInvFilters?`<button class="btn btn-ghost btn-sm" data-action="inv-clear-filters">✕ Clear</button>`:''}
           </div>
         </div>
 
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:6px;align-items:flex-end">
+          <div style="min-width:160px;flex:2">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Part Name</label>
+            <input id="inv-fq" class="form-input" style="padding:6px 8px" placeholder="Search names..." value="${esc(invF.q)}" data-action="inv-filter" data-field="q" autocomplete="off" />
+          </div>
+          <div style="min-width:120px;flex:1">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Part #</label>
+            <div class="cs-wrap" data-cs="inv-num">
+              <div class="cs-display" data-action="cs-open" data-cs="inv-num">${invF.num||'All Part #s'}</div>
+              <div class="cs-dropdown" id="cs-inv-num" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="inv-num" />
+                <div class="cs-option${!invF.num?' selected':''}" data-action="cs-inv-pick" data-field="num" data-val="">All Part #s</div>
+                ${[...new Set(inv.map(p=>p.num).filter(Boolean))].sort().map(n=>`<div class="cs-option${invF.num===n?' selected':''}" data-action="cs-inv-pick" data-field="num" data-val="${esc(n)}">${esc(n)}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div style="min-width:130px;flex:1">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Vendor</label>
+            <div class="cs-wrap" data-cs="inv-vendor">
+              <div class="cs-display" data-action="cs-open" data-cs="inv-vendor">${invF.vendor||'All Vendors'}</div>
+              <div class="cs-dropdown" id="cs-inv-vendor" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="inv-vendor" />
+                <div class="cs-option${!invF.vendor?' selected':''}" data-action="cs-inv-pick" data-field="vendor" data-val="">All Vendors</div>
+                ${[...new Set(inv.map(p=>p.vendor).filter(Boolean))].sort().map(v=>`<div class="cs-option${invF.vendor===v?' selected':''}" data-action="cs-inv-pick" data-field="vendor" data-val="${esc(v)}">${esc(v)}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div style="min-width:140px;flex:1">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Location</label>
+            <div class="cs-wrap" data-cs="inv-location">
+              <div class="cs-display" data-action="cs-open" data-cs="inv-location">${invF.location||'All Locations'}</div>
+              <div class="cs-dropdown" id="cs-inv-location" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="inv-location" />
+                <div class="cs-option${!invF.location?' selected':''}" data-action="cs-inv-pick" data-field="location" data-val="">All Locations</div>
+                ${[...new Set(inv.map(p=>p.location).filter(Boolean))].sort().map(l=>`<div class="cs-option${invF.location===l?' selected':''}" data-action="cs-inv-pick" data-field="location" data-val="${esc(l)}">${esc(l)}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-end">
+            ${activeInvFilters?`<button class="btn btn-ghost btn-sm" data-action="inv-clear-filters">✕ Clear</button>`:'<div style="width:60px"></div>'}
+          </div>
+        </div>
         <div class="po-add-bar">
           <div class="form-group" style="flex:2"><label class="form-lbl">Part Name *</label><input id="inv-name" class="form-input" placeholder="e.g. Oil Filter" /></div>
           <div class="form-group"><label class="form-lbl">Part #</label><input id="inv-num" class="form-input" placeholder="e.g. 1792XE" /></div>
@@ -2493,6 +2540,11 @@
         appView='parts'; render();
       } else if (action==='tab-inventory') {
         appView='inventory'; render();
+      } else if (action==='inv-filter') {
+        if (!window._invFilters) window._invFilters={q:'',num:'',vendor:'',location:''};
+        window._invFilters[el.dataset.field]=el.value; render();
+      } else if (action==='inv-clear-filters') {
+        window._invFilters={q:'',num:'',vendor:'',location:''}; render();
       } else if (action==='inv-search') {
         // handled by input event
       } else if (action==='add-inv-part') {
@@ -3207,6 +3259,13 @@
       const btn = e.target.closest('[data-action="cs-open"]');
       const pick = e.target.closest('[data-action="cs-pick"]');
 
+      const invPick = e.target.closest('[data-action="cs-inv-pick"]');
+      if (invPick) {
+        if (!window._invFilters) window._invFilters = {q:'',num:'',vendor:'',location:''};
+        window._invFilters[invPick.dataset.field] = invPick.dataset.val;
+        const dd = invPick.closest('.cs-dropdown'); if (dd) dd.style.display='none';
+        _csOpen = null; render(); return;
+      }
       if (pick) {
         poFilters[pick.dataset.field] = pick.dataset.val;
         const dd = document.getElementById('cs-' + pick.dataset.cs);
