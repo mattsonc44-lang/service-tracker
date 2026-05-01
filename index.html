@@ -1643,6 +1643,48 @@
       </div>`;
     }
 
+
+    function receivePartModalHTML(orderItem) {
+      const existingLocs = [...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))].sort();
+      const defaultCost = orderItem.unitCost||'';
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr">
+            <div class="modal-title">Receive Part</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div style="margin-bottom:14px;padding:10px 14px;background:var(--bg3);border-radius:4px">
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px">${esc(orderItem.desc||'')}</div>
+              ${orderItem.num?`<div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--amber-dim)">${esc(orderItem.num)}</div>`:''}
+              ${orderItem.vendor?`<div style="font-size:12px;color:var(--text-dim)">${esc(orderItem.vendor)}</div>`:''}
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-lbl">Unit Cost</label>
+                <input id="f-recv-cost" class="form-input" type="number" value="${esc(defaultCost)}" placeholder="$0.00" min="0" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label class="form-lbl">Qty Received</label>
+                <input id="f-recv-qty" class="form-input" type="number" value="${esc(orderItem.qty||'1')}" min="1" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Storage Location</label>
+              <input id="f-recv-location" class="form-input" list="recv-loc-list" placeholder="Select or type location..." autocomplete="off" />
+              <datalist id="recv-loc-list">
+                ${existingLocs.map(l=>`<option value="${esc(l)}"></option>`).join('')}
+              </datalist>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-receive">✓ Receive</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
     function customerModalHTML(c) {
       return `<div class="modal-overlay" id="modal-bg">
         <div class="modal">
@@ -1889,6 +1931,7 @@
         else if (modalState.type==='settings') modal = settingsModalHTML();
         else if (modalState.type==='inv-part') modal = invPartModalHTML(modalState.target);
         else if (modalState.type==='vendor') modal = vendorModalHTML(modalState.target);
+        else if (modalState.type==='receive-part') modal = receivePartModalHTML(modalState.target);
         else if (modalState.type==='edit-order-part') modal = editOrderPartModalHTML(modalState.target);
       }
 
@@ -2419,56 +2462,9 @@
         const orderItem = (data.partsToOrder||[]).find(p=>p.id===id);
         if (!orderItem) return;
         const nowReceived = !orderItem.received;
-
         if (nowReceived) {
-          // Step 1: Cost
-          const defaultCost = orderItem.unitCost||'';
-          const costInput = prompt('Receiving: ' + (orderItem.desc||'this part') + (orderItem.num?' ('+orderItem.num+')':'') + '\n\nUnit cost' + (defaultCost?' (pre-filled):':':'), defaultCost);
-          if (costInput === null) return;
-          const unitCost = costInput.trim() || defaultCost;
-          // Step 2: Location
-          const existingLocs = [...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))].sort();
-          let location = '';
-          if (existingLocs.length > 0) {
-            const locOptions = existingLocs.map((l,i)=>(i+1)+'. '+l).join('\n');
-            const locInput = prompt(
-              'Where is this part being stored?\n\n' + locOptions + '\n' + (existingLocs.length+1) + '. Other (enter new location)\n\nType a number or enter a location directly:',
-              ''
-            );
-            if (locInput === null) return;
-            const locNum = parseInt(locInput);
-            if (locNum >= 1 && locNum <= existingLocs.length) {
-              location = existingLocs[locNum-1];
-            } else if (locNum === existingLocs.length+1 || locInput.trim().toLowerCase() === 'other') {
-              const newLoc = prompt('Enter new storage location:','');
-              if (newLoc === null) return;
-              location = newLoc.trim();
-            } else {
-              location = locInput.trim(); // typed directly
-            }
-          } else {
-            // No locations yet — just ask
-            const locInput = prompt('Where is this part being stored? (e.g. Shop Shelf A, Parts Bin 3)','');
-            if (locInput === null) return;
-            location = locInput.trim();
-          }
-          const qtyReceived = parseInt(orderItem.qty)||1;
-          const parts = (data.partsToOrder||[]).map(p=>p.id===id?{...p, received:true, ordered:true, unitCost, receivedLocation:location}:p);
-          let partsInventory = data.partsInventory||[];
-          if (orderItem.invPartId) {
-            partsInventory = partsInventory.map(p=>p.id===orderItem.invPartId
-              ? {...p, qty:String((parseInt(p.qty)||0)+qtyReceived), location:location||p.location, unitCost:unitCost||p.unitCost}
-              : p);
-          } else {
-            if (confirm('Add "'+(orderItem.desc||orderItem.num||'this part')+'" to Parts Inventory?')) {
-              partsInventory = [...partsInventory, {
-                id:uid(), name:orderItem.desc||'', num:orderItem.num||'',
-                vendor:orderItem.vendor||'', qty:String(qtyReceived),
-                minQty:'', location, notes:'', unitCost
-              }];
-            }
-          }
-          update({...data, partsToOrder:parts, partsInventory});
+          // Open receive modal
+          modalState = {type:'receive-part', target:orderItem}; render();
         } else {
           // Un-receiving — warn about inventory impact
           const qtyReceived = parseInt(orderItem.qty)||1;
@@ -2486,6 +2482,28 @@
           }
           update({...data, partsToOrder:parts, partsInventory});
         }
+      } else if (action==='save-receive') {
+        const orderItem = modalState.target;
+        const unitCost = document.getElementById('f-recv-cost')?.value?.trim()||'';
+        const location = document.getElementById('f-recv-location')?.value?.trim()||'';
+        const qtyReceived = parseInt(document.getElementById('f-recv-qty')?.value)||1;
+        const parts = (data.partsToOrder||[]).map(p=>p.id===orderItem.id?{...p, received:true, ordered:true, unitCost, receivedLocation:location}:p);
+        let partsInventory = data.partsInventory||[];
+        if (orderItem.invPartId) {
+          partsInventory = partsInventory.map(p=>p.id===orderItem.invPartId
+            ? {...p, qty:String((parseInt(p.qty)||0)+qtyReceived), location:location||p.location, unitCost:unitCost||p.unitCost}
+            : p);
+        } else {
+          if (confirm('Add "'+(orderItem.desc||orderItem.num||'this part')+'" to Parts Inventory?')) {
+            partsInventory = [...partsInventory, {
+              id:uid(), name:orderItem.desc||'', num:orderItem.num||'',
+              vendor:orderItem.vendor||'', qty:String(qtyReceived),
+              minQty:'', location, notes:'', unitCost
+            }];
+          }
+        }
+        modalState=null;
+        update({...data, partsToOrder:parts, partsInventory});
       } else if (action==='edit-part-order') {
         const p=(data.partsToOrder||[]).find(p=>p.id===id)||null;
         if(p){modalState={type:'edit-order-part',target:p};render();}
