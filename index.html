@@ -106,7 +106,7 @@
     .part-inv-opt-qty.ok { background:rgba(22,163,74,.1); color:#16a34a; }
     .part-inv-opt-qty.low { background:rgba(217,119,6,.1); color:#d97706; }
     .part-inv-opt-qty.none { background:rgba(220,38,38,.1); color:#dc2626; }
-    .part-entry { display:grid; grid-template-columns:1fr 1fr 60px 90px auto auto; gap:8px; align-items:center; }
+    .part-entry { display:grid; grid-template-columns:1fr 1fr 60px 90px auto; gap:8px; align-items:center; }
     .part-cost-val { font-family:'Share Tech Mono',monospace; font-size:11px; color:#16a34a; margin-top:1px; }
     .part-entry input { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:7px 10px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; transition:border-color .15s; width:100%; }
     .part-entry input:focus { border-color:var(--amber); }
@@ -1172,7 +1172,7 @@
                     <td><input type="number" class="form-input" style="padding:4px 8px;font-size:12px;width:90px" placeholder="$0.00" value="${p.unitCost||''}" data-action="po-cost-input" data-id="${esc(p.id)}" min="0" step="0.01" /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} /></td>
                     <td style="text-align:center"><input type="checkbox" class="po-cb" data-action="toggle-part-received" data-id="${esc(p.id)}" ${p.received?'checked':''} /></td>
-                    <td style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-part-order" data-id="${esc(p.id)}">Edit</button><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
+                    <td style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-part-order" data-id="${esc(p.id)}">Edit</button><button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:#2563eb;border-color:rgba(37,99,235,.3)" data-action="po-price-search" title="Find best price">💲</button><button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button></td>
                   </tr>`;
                 }).join('')}
               </tbody>
@@ -1296,7 +1296,6 @@
                     <td style="font-size:12px;color:var(--text-dim)">${esc(p.notes||'')}</td>
                     <td style="display:flex;gap:4px;flex-wrap:wrap">
                       ${(low||none)?((data.partsToOrder||[]).some(o=>o.invPartId===p.id&&!o.received)?'<span style="font-size:10px;font-family:\'Share Tech Mono\',monospace;color:#d97706;padding:3px 6px;background:rgba(217,119,6,.1);border-radius:3px;white-space:nowrap">On Order</span>':'<button class="btn btn-sm" style="padding:3px 8px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);color:#dc2626" data-action="inv-reorder" data-id="'+esc(p.id)+'">+ Order</button>'):''}
-                      <button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:#2563eb;border-color:rgba(37,99,235,.3)" data-action="inv-price-search" data-id="${esc(p.id)}" title="Find best price">💲</button>
                       <button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-inv-part" data-id="${esc(p.id)}">Edit</button>
                       <button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-inv-part" data-id="${esc(p.id)}">✕</button>
                     </td>
@@ -1901,7 +1900,6 @@
                         </div>
                         <input class="part-qty-input" type="number" placeholder="Qty" value="${p.qtyUsed||'1'}" min="1" style="width:100%" />
                         <input class="part-cost-input" type="number" placeholder="Cost $" value="${esc(String(p.cost||''))}" style="width:100%" />
-                        <button class="part-price-btn" data-action="part-price-search" title="Find best price">💲</button>
                         <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
                       </div>`).join('');
                   })()}
@@ -2645,6 +2643,9 @@
           }
         });
         modalState=null; update(newData);
+      } else if (action==='po-price-search') {
+        const p=(data.partsToOrder||[]).find(p=>p.id===id);
+        if(p) showPricePanel(el, p.desc||'', p.num||'');
       } else if (action==='inv-price-search') {
         const p=(data.partsInventory||[]).find(p=>p.id===id);
         if(p) showPricePanel(el, p.name||'', p.num||'');
