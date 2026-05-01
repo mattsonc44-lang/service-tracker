@@ -3200,56 +3200,118 @@
     // ── Parts price search ────────────────────────────────────────────────────
     let _pricePanel = null;
 
-    function showPricePanel(btn, desc, num) {
-      // Close existing
+    function closePricePanel() {
       if (_pricePanel) { _pricePanel.remove(); _pricePanel = null; }
-      const query = encodeURIComponent([desc, num].filter(Boolean).join(' '));
-      const numOnly = encodeURIComponent(num || desc);
+    }
 
-      const suppliers = [
-        {name:'NAPA Auto Parts',   url:'https://www.napaonline.com/en/search?q='+query,                   color:'#cc0000'},
-        {name:'RockAuto',          url:'https://www.rockauto.com/en/catalog/search.html?q='+query,         color:'#e04a00'},
-        {name:'AutoZone',          url:'https://www.autozone.com/searchresult?searchtext='+query,          color:'#e20000'},
-        {name:'OReilly Auto',    url:'https://www.oreillyauto.com/shop/b/search?q='+query,               color:'#d62300'},
-        {name:'Amazon',            url:'https://www.amazon.com/s?k='+query,                                color:'#ff9900'},
-        {name:'eBay',              url:'https://www.ebay.com/sch/i.html?_nkw='+query,                      color:'#e53238'},
-        {name:'Caterpillar Parts', url:'https://parts.cat.com/en/search/'+numOnly,                         color:'#ffcd11'},
-        {name:'John Deere Parts',  url:'https://partscatalog.deere.com/jdrc/partsSearch.html?q='+numOnly,  color:'#367c2b'},
-        {name:'Google Shopping',   url:'https://www.google.com/search?tbm=shop&q='+query,                  color:'#4285f4'},
-      ];
+    function positionPanel(panel, btn) {
+      const rect = btn.getBoundingClientRect();
+      const ph = panel.offsetHeight || 400;
+      const top = rect.bottom + 4 + ph > window.innerHeight ? rect.top - ph - 4 : rect.bottom + 4;
+      panel.style.top  = Math.max(8, top) + 'px';
+      panel.style.left = Math.min(rect.left, window.innerWidth - 370) + 'px';
+    }
+
+    function showPricePanel(btn, desc, num) {
+      closePricePanel();
+      const query = encodeURIComponent([desc, num].filter(Boolean).join(' '));
+      const searchLabel = (desc||'') + (num ? ' #'+num : '');
 
       const panel = document.createElement('div');
       panel.className = 'price-search-panel';
+      panel.style.cssText = 'position:fixed;z-index:999999;min-width:320px;max-width:380px;max-height:80vh;overflow-y:auto';
       panel.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
-        + '<div class="price-search-title">🔍 Find Best Price</div>'
-        + '<button onclick="this.closest(\".price-search-panel\").remove()" style="background:none;border:none;font-size:16px;cursor:pointer;color:#9ca3af">✕</button>'
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+        + '<div class="price-search-title">🔍 Price Search</div>'
+        + '<button onclick="closePricePanel()" style="background:none;border:none;font-size:16px;cursor:pointer;color:#9ca3af">✕</button>'
         + '</div>'
-        + '<div style="font-size:11px;color:#9ca3af;font-family:Share Tech Mono,monospace;margin-bottom:8px;word-break:break-all">'+(desc||num)+(num&&desc?' · #'+num:'')+'</div>'
-        + suppliers.map(s =>
-            '<a class="price-search-link" href="'+s.url+'" target="_blank" rel="noopener">'
-            + '<span style="width:10px;height:10px;border-radius:50%;background:'+s.color+';flex-shrink:0;display:inline-block"></span>'
-            + s.name+'</a>'
-          ).join('')
-        + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">Opens in new tab</div>';
+        + '<div style="font-size:11px;color:#9ca3af;font-family:Share Tech Mono,monospace;margin-bottom:10px;word-break:break-all">'+searchLabel+'</div>'
+        + '<div id="price-results" style="font-size:13px;color:#374151">'
+        + '<div style="display:flex;align-items:center;gap:8px;padding:10px 0">'
+        + '<div style="width:16px;height:16px;border:2px solid #d97706;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0"></div>'
+        + 'Searching for prices...</div></div>'
+        + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;gap:6px;flex-wrap:wrap" id="price-links"></div>';
 
       document.body.appendChild(panel);
       _pricePanel = panel;
+      positionPanel(panel, btn);
 
-      // Position near the button
-      const rect = btn.getBoundingClientRect();
-      const panelH = 420; // estimate
-      const top = rect.bottom + 4 + panelH > window.innerHeight
-        ? rect.top - panelH - 4
-        : rect.bottom + 4;
-      panel.style.top  = Math.max(8, top) + 'px';
-      panel.style.left = Math.min(rect.left, window.innerWidth - 350) + 'px';
+      // Add quick links
+      const q = encodeURIComponent([desc,num].filter(Boolean).join(' '));
+      const n = encodeURIComponent(num||desc);
+      const links = [
+        {n:'NAPA',   url:'https://www.napaonline.com/en/search?q='+q},
+        {n:'RockAuto', url:'https://www.rockauto.com/en/catalog/search.html?q='+q},
+        {n:'Amazon', url:'https://www.amazon.com/s?k='+q},
+        {n:'eBay',   url:'https://www.ebay.com/sch/i.html?_nkw='+q},
+        {n:'Google Shopping', url:'https://www.google.com/search?tbm=shop&q='+q},
+      ];
+      const linksEl = panel.querySelector('#price-links');
+      if (linksEl) linksEl.innerHTML = links.map(l=>
+        '<a href="'+l.url+'" target="_blank" rel="noopener" style="font-size:11px;color:#2563eb;text-decoration:none;padding:3px 8px;border:1px solid #d1d5db;border-radius:4px;background:#f9fafb">'+l.n+'</a>'
+      ).join('');
+
+      // Call Claude API with web search
+      fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          tools: [{type: 'web_search_20250305', name: 'web_search'}],
+          messages: [{
+            role: 'user',
+            content: 'Search for current prices for this part: ' + searchLabel + '. '
+              + 'Check NAPA, RockAuto, AutoZone, Amazon, and eBay. '
+              + 'Return a concise JSON array of results like: '
+              + '[{"store":"NAPA","price":"$12.99","note":"part# 1792","url":"https://..."},...] '
+              + 'Only include results where you find an actual price. Max 6 results. '
+              + 'Respond with ONLY the JSON array, no markdown, no explanation.'
+          }]
+        })
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        const resultsEl = panel.querySelector('#price-results');
+        if (!resultsEl || !panel.isConnected) return;
+
+        // Extract text from response
+        const textBlocks = (data.content||[]).filter(b=>b.type==='text');
+        const rawText = textBlocks.map(b=>b.text).join('');
+
+        let results = [];
+        try {
+          const jsonMatch = rawText.match(/\[[\s\S]*\]/);
+          if (jsonMatch) results = JSON.parse(jsonMatch[0]);
+        } catch(e) {}
+
+        if (!results.length) {
+          resultsEl.innerHTML = '<div style="color:#9ca3af;font-size:12px;padding:8px 0">No prices found. Try the links below.</div>';
+          return;
+        }
+
+        resultsEl.innerHTML = results.map(function(r) {
+          return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid #f3f4f6;gap:8px">'
+            + '<div>'
+            + '<div style="font-weight:600;font-size:13px">'+(r.url?'<a href="'+r.url+'" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:none">'+r.store+'</a>':r.store)+'</div>'
+            + (r.note?'<div style="font-size:11px;color:#9ca3af">'+r.note+'</div>':'')
+            + '</div>'
+            + '<div style="font-family:Share Tech Mono,monospace;font-size:15px;font-weight:700;color:#16a34a;flex-shrink:0">'+r.price+'</div>'
+            + '</div>';
+        }).join('');
+        positionPanel(panel, btn);
+      })
+      .catch(function() {
+        const resultsEl = panel.querySelector('#price-results');
+        if (resultsEl && panel.isConnected)
+          resultsEl.innerHTML = '<div style="color:#dc2626;font-size:12px;padding:8px 0">Search failed. Use the links below.</div>';
+      });
 
       // Close on outside click
       setTimeout(function() {
         document.addEventListener('click', function handler(e) {
           if (!panel.contains(e.target) && e.target !== btn) {
-            panel.remove(); _pricePanel = null;
+            closePricePanel();
             document.removeEventListener('click', handler);
           }
         });
