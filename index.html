@@ -1887,11 +1887,9 @@
                       <div class="part-entry" data-part-idx="${i}" data-inv-id="${p.invPartId||''}">
                         <div class="part-inv-wrap">
                           <input class="part-desc-input" placeholder="Search or type new part..." value="${esc(p.desc||'')}" autocomplete="off" />
-                          <div class="part-svc-dropdown" style="display:none"></div>
                         </div>
                         <div class="part-inv-wrap">
                           <input class="part-num-input" placeholder="Part #" value="${esc(p.num||'')}" autocomplete="off" />
-                          <div class="part-num-dropdown" style="display:none"></div>
                         </div>
                         <input class="part-qty-input" type="number" placeholder="Qty" value="${p.qtyUsed||'1'}" min="1" style="width:100%" />
                         <input class="part-cost-input" type="number" placeholder="Cost $" value="${esc(String(p.cost||''))}" style="width:100%" />
@@ -3178,21 +3176,62 @@
 ;
 
 
-    // Auto-fill part# and cost when user picks from inventory datalist
-    document.getElementById('app').addEventListener('input', function(e) {
-      if (!e.target.classList || !e.target.classList.contains('part-desc-input')) return;
-      const val = e.target.value.trim().toLowerCase();
-      if (!val) return;
-      const match = (data.partsInventory||[]).find(p=>(p.name||'').toLowerCase()===val);
-      if (!match) return;
-      const entry = e.target.closest('.part-entry');
-      if (!entry) return;
-      const numInput  = entry.querySelector('.part-num-input');
-      const costInput = entry.querySelector('.part-cost-input');
-      if (numInput  && !numInput.value)  numInput.value  = match.num||'';
-      if (costInput && !costInput.value) costInput.value = match.unitCost||'';
-      entry.dataset.invId = match.id;
-    }, true);
+    // ── Global floating parts picker ────────────────────────────────────────
+    let _ppInput = null, _ppMode = null;
+
+    function buildPickerOpts(q, mode) {
+      const inv = data.partsInventory || [];
+      const all = q ? inv.filter(p => mode==='num'
+          ? (p.num||'').toLowerCase().includes(q)||(p.name||'').toLowerCase().includes(q)
+          : (p.name||'').toLowerCase().includes(q)||(p.num||'').toLowerCase().includes(q)||(p.vendor||'').toLowerCase().includes(q))
+        : inv.filter(p=>mode==='num'?!!p.num:true).sort((a,b)=>(a.name||'').localeCompare(b.name||'')).slice(0,25);
+      return all.map(p=>{
+        const qty=p.qty!==''?parseInt(p.qty):null;
+        const qc=qty===null?'#9ca3af':qty===0?'#dc2626':qty<=(parseInt(p.minQty)||0)?'#d97706':'#16a34a';
+        const primary=mode==='num'?esc(p.num||'—'):esc(p.name||'');
+        const sub=mode==='num'?esc(p.name||''):(p.num?'#'+esc(p.num):'')+(p.vendor?' · '+esc(p.vendor):'');
+        return '<div style="padding:9px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #f3f4f6" class="ppi" data-id="'+esc(p.id)+'" data-name="'+esc(p.name)+'" data-num="'+esc(p.num||'')+'" data-cost="'+esc(p.unitCost||'')+'">'
+          +'<div><div style="font-size:13px;font-weight:600;color:#111827">'+primary+'</div>'+(sub?'<div style="font-size:11px;color:#9ca3af">'+sub+'</div>':'')+'</div>'
+          +(qty!==null?'<span style="font-family:Share Tech Mono,monospace;font-size:11px;color:'+qc+'">'+qty+'</span>':'')+'</div>';
+      }).join('');
+    }
+
+    function showPP(input, mode) {
+      _ppInput=input; _ppMode=mode;
+      let pk=document.getElementById('gpp');
+      if(!pk){pk=document.createElement('div');pk.id='gpp';pk.style.cssText='position:fixed;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.15);z-index:999999;max-height:260px;overflow-y:auto;min-width:260px;display:none';document.body.appendChild(pk);}
+      const q=input.value.trim().toLowerCase();
+      const opts=buildPickerOpts(q,mode);
+      if(!opts){pk.style.display='none';return;}
+      pk.innerHTML='<div style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-size:10px;color:#9ca3af;letter-spacing:1px;text-transform:uppercase">'+(mode==='num'?'Part Numbers':'Parts Inventory')+'</div>'+opts;
+      pk.querySelectorAll('.ppi').forEach(function(o){o.addEventListener('mouseover',function(){o.style.background='rgba(217,119,6,.06)';});o.addEventListener('mouseout',function(){o.style.background='';});});
+      const r=input.getBoundingClientRect();
+      pk.style.top=(r.bottom+4)+'px';pk.style.left=r.left+'px';pk.style.minWidth=Math.max(r.width,260)+'px';pk.style.display='block';
+    }
+    function hidePP(){const pk=document.getElementById('gpp');if(pk)pk.style.display='none';_ppInput=null;_ppMode=null;}
+    function applyPP(opt){
+      const entry=(_ppInput||document.activeElement).closest('.part-entry');
+      if(!entry)return;
+      const di=entry.querySelector('.part-desc-input'),ni=entry.querySelector('.part-num-input'),ci=entry.querySelector('.part-cost-input');
+      if(_ppMode==='desc'){if(di)di.value=opt.dataset.name||'';if(ni&&!ni.value)ni.value=opt.dataset.num||'';if(ci&&!ci.value)ci.value=opt.dataset.cost||'';}
+      else{if(ni)ni.value=opt.dataset.num||'';if(di&&!di.value)di.value=opt.dataset.name||'';if(ci&&!ci.value)ci.value=opt.dataset.cost||'';}
+      entry.dataset.invId=opt.dataset.id||opt.dataset.invId||'';
+      hidePP();
+    }
+    document.addEventListener('mousedown',function(e){
+      const pk=document.getElementById('gpp');if(!pk||pk.style.display==='none')return;
+      const opt=e.target.closest('.ppi');
+      if(opt&&pk.contains(opt)){e.preventDefault();applyPP(opt);return;}
+      if(!pk.contains(e.target)&&e.target!==_ppInput)hidePP();
+    },true);
+    document.addEventListener('input',function(e){
+      if(e.target.classList&&e.target.classList.contains('part-desc-input'))showPP(e.target,'desc');
+      else if(e.target.classList&&e.target.classList.contains('part-num-input'))showPP(e.target,'num');
+    },true);
+    document.addEventListener('click',function(e){
+      if(e.target.classList&&e.target.classList.contains('part-desc-input'))showPP(e.target,'desc');
+      else if(e.target.classList&&e.target.classList.contains('part-num-input'))showPP(e.target,'num');
+    },true);
 
 
     // Custom select handlers — dropdowns rendered at fixed position escape overflow:auto
