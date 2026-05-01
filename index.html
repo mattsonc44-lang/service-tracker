@@ -1889,7 +1889,10 @@
                           <input class="part-desc-input" placeholder="Search or type new part..." value="${esc(p.desc||'')}" autocomplete="off" />
                           <div class="part-svc-dropdown" style="display:none"></div>
                         </div>
-                        <input class="part-num-input" placeholder="Part #" value="${esc(p.num||'')}" />
+                        <div class="part-inv-wrap">
+                          <input class="part-num-input" placeholder="Part #" value="${esc(p.num||'')}" autocomplete="off" />
+                          <div class="part-num-dropdown" style="display:none"></div>
+                        </div>
                         <input class="part-qty-input" type="number" placeholder="Qty" value="${p.qtyUsed||'1'}" min="1" style="width:100%" />
                         <input class="part-cost-input" type="number" placeholder="Cost $" value="${esc(String(p.cost||''))}" style="width:100%" />
                         <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
