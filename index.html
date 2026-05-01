@@ -106,11 +106,18 @@
     .part-inv-opt-qty.ok { background:rgba(22,163,74,.1); color:#16a34a; }
     .part-inv-opt-qty.low { background:rgba(217,119,6,.1); color:#d97706; }
     .part-inv-opt-qty.none { background:rgba(220,38,38,.1); color:#dc2626; }
-    .part-entry { display:grid; grid-template-columns:1fr 1fr 60px 90px auto; gap:8px; align-items:center; }
+    .part-entry { display:grid; grid-template-columns:1fr 1fr 60px 90px auto auto; gap:8px; align-items:center; }
     .part-cost-val { font-family:'Share Tech Mono',monospace; font-size:11px; color:#16a34a; margin-top:1px; }
     .part-entry input { background:var(--bg3); border:1px solid var(--border2); border-radius:4px; padding:7px 10px; color:var(--text-bright); font-family:'Barlow',sans-serif; font-size:13px; outline:none; transition:border-color .15s; width:100%; }
     .part-entry input:focus { border-color:var(--amber); }
     .part-remove-btn { background:rgba(220,38,38,.1); border:1px solid rgba(220,38,38,.25); color:#dc2626; border-radius:4px; padding:6px 10px; cursor:pointer; font-size:14px; line-height:1; }
+    .part-price-btn { background:rgba(37,99,235,.08); border:1px solid rgba(37,99,235,.25); color:#2563eb; border-radius:4px; padding:5px 8px; cursor:pointer; font-size:12px; line-height:1; white-space:nowrap; font-family:'Share Tech Mono',monospace; }
+    .part-price-btn:hover { background:rgba(37,99,235,.15); }
+    .price-search-panel { position:fixed; background:#fff; border:1px solid #d1d5db; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,.18); z-index:999999; padding:14px; min-width:280px; max-width:340px; }
+    .price-search-title { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; color:#111827; margin-bottom:10px; }
+    .price-search-link { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:4px; text-decoration:none; color:#374151; font-size:13px; transition:background .12s; }
+    .price-search-link:hover { background:#f3f4f6; }
+    .price-search-logo { width:18px; height:18px; border-radius:2px; object-fit:contain; flex-shrink:0; }
     .part-remove-btn:hover { background:rgba(220,38,38,.2); }
     .add-part-btn { background:none; border:1px dashed var(--border2); border-radius:4px; color:var(--text-dim); font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:600; padding:7px 12px; cursor:pointer; transition:border-color .15s,color .15s; margin-top:2px; }
     .add-part-btn:hover { border-color:var(--amber); color:var(--amber); }
@@ -1289,6 +1296,7 @@
                     <td style="font-size:12px;color:var(--text-dim)">${esc(p.notes||'')}</td>
                     <td style="display:flex;gap:4px;flex-wrap:wrap">
                       ${(low||none)?((data.partsToOrder||[]).some(o=>o.invPartId===p.id&&!o.received)?'<span style="font-size:10px;font-family:\'Share Tech Mono\',monospace;color:#d97706;padding:3px 6px;background:rgba(217,119,6,.1);border-radius:3px;white-space:nowrap">On Order</span>':'<button class="btn btn-sm" style="padding:3px 8px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);color:#dc2626" data-action="inv-reorder" data-id="'+esc(p.id)+'">+ Order</button>'):''}
+                      <button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:#2563eb;border-color:rgba(37,99,235,.3)" data-action="inv-price-search" data-id="${esc(p.id)}" title="Find best price">💲</button>
                       <button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-inv-part" data-id="${esc(p.id)}">Edit</button>
                       <button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-inv-part" data-id="${esc(p.id)}">✕</button>
                     </td>
@@ -1893,6 +1901,7 @@
                         </div>
                         <input class="part-qty-input" type="number" placeholder="Qty" value="${p.qtyUsed||'1'}" min="1" style="width:100%" />
                         <input class="part-cost-input" type="number" placeholder="Cost $" value="${esc(String(p.cost||''))}" style="width:100%" />
+                        <button class="part-price-btn" data-action="part-price-search" title="Find best price">💲</button>
                         <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
                       </div>`).join('');
                   })()}
@@ -2636,6 +2645,9 @@
           }
         });
         modalState=null; update(newData);
+      } else if (action==='inv-price-search') {
+        const p=(data.partsInventory||[]).find(p=>p.id===id);
+        if(p) showPricePanel(el, p.name||'', p.num||'');
       } else if (action==='edit-inv-part') {
         const p=(data.partsInventory||[]).find(p=>p.id===id)||null;
         if(p){modalState={type:'inv-part',target:p};render();}
@@ -2887,6 +2899,13 @@
         div.dataset.partIdx = idx;
         div.innerHTML = '<div class="part-inv-wrap"><input class="part-desc-input" placeholder="Description..." list="inv-parts-dl" autocomplete="off" /></div><input class="part-num-input" placeholder="Part #" /><input class="part-cost-input" type="number" placeholder="Cost $" style="width:100%" /><button class="part-remove-btn" data-action="remove-part" data-idx="'+idx+'">✕</button>';
         list.appendChild(div);
+      } else if (action==='part-price-search') {
+        const entry = el.closest('.part-entry');
+        if (!entry) return;
+        const desc = entry.querySelector('.part-desc-input')?.value?.trim()||'';
+        const num  = entry.querySelector('.part-num-input')?.value?.trim()||'';
+        if (!desc && !num) { alert('Enter a part description or part # first.'); return; }
+        showPricePanel(el, desc, num);
       } else if (action==='remove-part') {
         const entry = el.closest('.part-entry');
         if (entry) {
@@ -3175,6 +3194,66 @@
 
 ;
 
+
+
+    // ── Parts price search ────────────────────────────────────────────────────
+    let _pricePanel = null;
+
+    function showPricePanel(btn, desc, num) {
+      // Close existing
+      if (_pricePanel) { _pricePanel.remove(); _pricePanel = null; }
+      const query = encodeURIComponent([desc, num].filter(Boolean).join(' '));
+      const numOnly = encodeURIComponent(num || desc);
+
+      const suppliers = [
+        {name:'NAPA Auto Parts',   url:'https://www.napaonline.com/en/search?q='+query,                   color:'#cc0000'},
+        {name:'RockAuto',          url:'https://www.rockauto.com/en/catalog/search.html?q='+query,         color:'#e04a00'},
+        {name:'AutoZone',          url:'https://www.autozone.com/searchresult?searchtext='+query,          color:'#e20000'},
+        {name:'OReilly Auto',    url:'https://www.oreillyauto.com/shop/b/search?q='+query,               color:'#d62300'},
+        {name:'Amazon',            url:'https://www.amazon.com/s?k='+query,                                color:'#ff9900'},
+        {name:'eBay',              url:'https://www.ebay.com/sch/i.html?_nkw='+query,                      color:'#e53238'},
+        {name:'Caterpillar Parts', url:'https://parts.cat.com/en/search/'+numOnly,                         color:'#ffcd11'},
+        {name:'John Deere Parts',  url:'https://partscatalog.deere.com/jdrc/partsSearch.html?q='+numOnly,  color:'#367c2b'},
+        {name:'Google Shopping',   url:'https://www.google.com/search?tbm=shop&q='+query,                  color:'#4285f4'},
+      ];
+
+      const panel = document.createElement('div');
+      panel.className = 'price-search-panel';
+      panel.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+        + '<div class="price-search-title">🔍 Find Best Price</div>'
+        + '<button onclick="this.closest(\".price-search-panel\").remove()" style="background:none;border:none;font-size:16px;cursor:pointer;color:#9ca3af">✕</button>'
+        + '</div>'
+        + '<div style="font-size:11px;color:#9ca3af;font-family:Share Tech Mono,monospace;margin-bottom:8px;word-break:break-all">'+(desc||num)+(num&&desc?' · #'+num:'')+'</div>'
+        + suppliers.map(s =>
+            '<a class="price-search-link" href="'+s.url+'" target="_blank" rel="noopener">'
+            + '<span style="width:10px;height:10px;border-radius:50%;background:'+s.color+';flex-shrink:0;display:inline-block"></span>'
+            + s.name+'</a>'
+          ).join('')
+        + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">Opens in new tab</div>';
+
+      document.body.appendChild(panel);
+      _pricePanel = panel;
+
+      // Position near the button
+      const rect = btn.getBoundingClientRect();
+      const panelH = 420; // estimate
+      const top = rect.bottom + 4 + panelH > window.innerHeight
+        ? rect.top - panelH - 4
+        : rect.bottom + 4;
+      panel.style.top  = Math.max(8, top) + 'px';
+      panel.style.left = Math.min(rect.left, window.innerWidth - 350) + 'px';
+
+      // Close on outside click
+      setTimeout(function() {
+        document.addEventListener('click', function handler(e) {
+          if (!panel.contains(e.target) && e.target !== btn) {
+            panel.remove(); _pricePanel = null;
+            document.removeEventListener('click', handler);
+          }
+        });
+      }, 50);
+    }
 
     // ── Global floating parts picker ────────────────────────────────────────
     let _ppInput = null, _ppMode = null;
