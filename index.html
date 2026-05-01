@@ -2498,9 +2498,31 @@
       } else if (action==='add-inv-part') {
         const name = document.getElementById('inv-name')?.value?.trim()||'';
         if(!name){alert('Part name is required.');return;}
+        const newNum = document.getElementById('inv-num')?.value?.trim()||'';
+        // Check for duplicate part # only (vendor doesn't matter)
+        if (newNum) {
+          const existing = (data.partsInventory||[]).find(p=>
+            p.num && p.num.trim().toLowerCase() === newNum.toLowerCase()
+          );
+          if (existing) {
+            const addQty = prompt(
+              'Part # '+newNum+' already exists in inventory as "'+existing.name+'" (qty: '+(existing.qty||'0')+').\n\nHow many to add to existing qty? (Cancel to add as a separate entry)',
+              ''
+            );
+            if (addQty !== null) {
+              const addNum = parseInt(addQty)||0;
+              if (addNum > 0) {
+                const newQty = String((parseInt(existing.qty)||0) + addNum);
+                update({...data, partsInventory:(data.partsInventory||[]).map(p=>p.id===existing.id?{...p,qty:newQty}:p)});
+                return;
+              }
+              // 0 or blank — fall through to add as new
+            }
+          }
+        }
         const newP = {
           id:uid(), name,
-          num:  document.getElementById('inv-num')?.value?.trim()||'',
+          num:  newNum,
           vendor:document.getElementById('inv-vendor')?.value?.trim()||'',
           qty:  document.getElementById('inv-qty')?.value?.trim()||'',
           minQty:document.getElementById('inv-minqty')?.value?.trim()||'',
