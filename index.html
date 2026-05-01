@@ -270,6 +270,8 @@
     .cs-display { background:#fff; border:1px solid var(--border); border-radius:4px; padding:6px 28px 6px 8px; font-size:13px; color:var(--text-bright); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; user-select:none; font-family:'Barlow',sans-serif; }
     .cs-display::after { content:'▾'; position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--text-dim); pointer-events:none; }
     .cs-dropdown { position:fixed; background:#fff; border:1px solid var(--border); border-radius:4px; box-shadow:0 4px 16px rgba(0,0,0,.12); z-index:9999; max-height:220px; overflow-y:auto; min-width:140px; }
+    .cs-search { width:100%; border:none; border-bottom:1px solid var(--border); padding:8px 10px; font-size:13px; font-family:'Barlow',sans-serif; color:var(--text-bright); outline:none; background:#fafafa; }
+    .cs-search:focus { background:#fff; }
     .cs-option { padding:8px 12px; font-size:13px; color:var(--text-bright); cursor:pointer; font-family:'Barlow',sans-serif; }
     .cs-option:hover, .cs-option.active { background:rgba(217,119,6,.08); color:var(--amber-dim); }
     .cs-option.selected { font-weight:600; color:var(--amber-dim); }
@@ -1064,6 +1066,7 @@
             <div class="cs-wrap" data-cs="po-vendor">
               <div class="cs-display" data-action="cs-open" data-cs="po-vendor">${pf.vendor||'All Vendors'}</div>
               <div class="cs-dropdown" id="cs-po-vendor" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="po-vendor" />
                 <div class="cs-option${!pf.vendor?' selected':''}" data-action="cs-pick" data-cs="po-vendor" data-field="vendor" data-val="">All Vendors</div>
                 ${vendors.map(v=>`<div class="cs-option${pf.vendor===v?' selected':''}" data-action="cs-pick" data-cs="po-vendor" data-field="vendor" data-val="${esc(v)}">${esc(v)}</div>`).join('')}
               </div>
@@ -1074,6 +1077,7 @@
             <div class="cs-wrap" data-cs="po-num">
               <div class="cs-display" data-action="cs-open" data-cs="po-num">${pf.num||'All Part #s'}</div>
               <div class="cs-dropdown" id="cs-po-num" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="po-num" />
                 <div class="cs-option${!pf.num?' selected':''}" data-action="cs-pick" data-cs="po-num" data-field="num" data-val="">All Part #s</div>
                 ${[...new Set(allParts.map(p=>p.num).filter(Boolean))].sort().map(n=>`<div class="cs-option${pf.num===n?' selected':''}" data-action="cs-pick" data-cs="po-num" data-field="num" data-val="${esc(n)}">${esc(n)}</div>`).join('')}
               </div>
@@ -1093,6 +1097,7 @@
             <div class="cs-wrap" data-cs="po-vehicle">
               <div class="cs-display" data-action="cs-open" data-cs="po-vehicle">${pf.vehicle===''?'All Vehicles':pf.vehicle==='__stock__'?'📦 For Stock':((data.vehicles||[]).find(v=>v.id===pf.vehicle)||{}).name||'All Vehicles'}</div>
               <div class="cs-dropdown" id="cs-po-vehicle" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="po-vehicle" />
                 <div class="cs-option${!pf.vehicle?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="">All Vehicles</div>
                 <div class="cs-option${pf.vehicle==='__stock__'?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="__stock__">📦 For Stock</div>
                 ${(data.vehicles||[]).filter(v=>allParts.some(p=>p.vehicleId===v.id)).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<div class="cs-option${pf.vehicle===v.id?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="${esc(v.id)}">${esc(v.name)}</div>`).join('')}
@@ -2937,6 +2942,48 @@
     // Custom select handlers — dropdowns rendered at fixed position escape overflow:auto
     let _csOpen = null;
 
+    document.addEventListener('input', function(e) {
+      const csKey = e.target.dataset.csSearch;
+      if (!csKey) return;
+      const q = e.target.value.toLowerCase().trim();
+      const dd = document.getElementById('cs-' + csKey);
+      if (!dd) return;
+      // Show/hide options based on search
+      const options = dd.querySelectorAll('.cs-option');
+      options.forEach(function(opt) {
+        const txt = opt.textContent.toLowerCase();
+        // Always show "All X" option (empty val)
+        opt.style.display = (!q || opt.dataset.val === '' || txt.includes(q)) ? '' : 'none';
+      });
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.target.dataset.csSearch) {
+        const q = e.target.value.trim();
+        if (!q) return;
+        const csKey = e.target.dataset.csSearch;
+        const dd = document.getElementById('cs-' + csKey);
+        if (!dd) return;
+        // Find first visible non-empty option or treat typed value as custom filter
+        const visible = [...dd.querySelectorAll('.cs-option')].find(o => o.style.display !== 'none' && o.dataset.val);
+        if (visible) {
+          visible.click();
+        } else {
+          // Use typed value directly as filter
+          const field = csKey === 'po-vendor' ? 'vendor' : csKey === 'po-num' ? 'num' : 'vehicle';
+          poFilters[field] = q;
+          dd.style.display = 'none';
+          _csOpen = null;
+          render();
+        }
+      }
+      if (e.key === 'Escape' && _csOpen) {
+        document.querySelectorAll('.cs-dropdown').forEach(d => d.style.display = 'none');
+        _csOpen = null;
+      }
+    });
+
+
     function csPosition(btn) {
       const dd = document.getElementById('cs-' + btn.dataset.cs);
       if (!dd) return;
@@ -2946,6 +2993,13 @@
       dd.style.minWidth = rect.width + 'px';
       dd.style.display = 'block';
       _csOpen = btn.dataset.cs;
+      // Reset search + show all options
+      const searchEl = dd.querySelector('.cs-search');
+      if (searchEl) {
+        searchEl.value = '';
+        dd.querySelectorAll('.cs-option').forEach(o => o.style.display = '');
+        setTimeout(function(){ searchEl.focus(); }, 30);
+      }
     }
 
     document.addEventListener('click', function(e) {
@@ -2974,8 +3028,8 @@
         return;
       }
 
-      // Click outside — close all
-      if (_csOpen) {
+      // Click outside — close all (but not if clicking inside a dropdown)
+      if (_csOpen && !e.target.closest('.cs-dropdown') && !e.target.closest('.cs-wrap')) {
         document.querySelectorAll('.cs-dropdown').forEach(d => d.style.display = 'none');
         _csOpen = null;
       }
