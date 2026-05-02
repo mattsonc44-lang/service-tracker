@@ -831,6 +831,143 @@
 
 
 
+
+    function renderCostAnalysis() {
+      const vehicles = data.vehicles || [];
+      const records  = data.records  || [];
+      const customers = data.customers || [];
+
+      // Build cost per vehicle
+      const vCosts = vehicles.map(v => {
+        const vRecs = records.filter(r => r.vehicleId === v.id);
+        const total = vRecs.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
+        const cust  = customers.find(c=>c.id===v.customerId);
+        return { v, recs:vRecs, total, cust };
+      }).filter(vc => vc.recs.length > 0 || vc.total > 0)
+        .sort((a,b) => b.total - a.total);
+
+      const grandTotal = vCosts.reduce((s,vc)=>s+vc.total, 0);
+      const maxCost    = vCosts[0]?.total || 1;
+
+      // Cost by customer
+      const custCosts = {};
+      vCosts.forEach(vc => {
+        const cn = vc.cust?.name || 'Unassigned';
+        if (!custCosts[cn]) custCosts[cn] = 0;
+        custCosts[cn] += vc.total;
+      });
+      const custEntries = Object.entries(custCosts).sort((a,b)=>b[1]-a[1]);
+
+      // Cost by service type
+      const typeCosts = {};
+      records.forEach(r => {
+        const t = r.type || 'Other';
+        if (!typeCosts[t]) typeCosts[t] = 0;
+        typeCosts[t] += parseFloat(r.cost)||0;
+      });
+      const typeEntries = Object.entries(typeCosts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+      // Year over year totals
+      const yearCosts = {};
+      records.forEach(r => {
+        const y = (r.date||'').slice(0,4);
+        if (!y || y < '2010') return;
+        if (!yearCosts[y]) yearCosts[y] = 0;
+        yearCosts[y] += parseFloat(r.cost)||0;
+      });
+      const yearEntries = Object.entries(yearCosts).sort((a,b)=>a[0].localeCompare(b[0]));
+      const maxYear = yearEntries.reduce((m,e)=>Math.max(m,e[1]),1);
+
+      const barColor = (pct) => pct > 0.66 ? '#dc2626' : pct > 0.33 ? '#d97706' : '#16a34a';
+
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="overview-title">Maintenance Cost Analysis</div>
+            <div class="overview-sub">${vCosts.length} equipment tracked · Total: <strong>$${grandTotal.toLocaleString(undefined,{minimumFractionDigits:2})}</strong></div>
+          </div>
+        </div>
+
+        <!-- Summary stats -->
+        <div class="summary-bar" style="margin-bottom:20px">
+          <div class="summary-stat"><div class="summary-stat-val">${vCosts.length}</div><div class="summary-stat-lbl">Equipment w/ Records</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">$${grandTotal>0?(grandTotal/vCosts.length).toLocaleString(undefined,{maximumFractionDigits:0}):'0'}</div><div class="summary-stat-lbl">Avg Cost / Unit</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">$${vCosts[0]?vCosts[0].total.toLocaleString(undefined,{maximumFractionDigits:0}):'0'}</div><div class="summary-stat-lbl">Most Expensive Unit</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${records.length}</div><div class="summary-stat-lbl">Total Service Records</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+
+          <!-- Cost by service type -->
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:16px">
+            <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;margin-bottom:12px">Cost by Service Type</div>
+            ${typeEntries.map(([t,cost])=>{
+              const pct = cost/(typeEntries[0]?.[1]||1);
+              return `<div style="margin-bottom:8px">
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+                  <span style="color:var(--text-dim)">${esc(t)}</span>
+                  <span style="font-family:'Share Tech Mono',monospace;font-weight:700">$${cost.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                </div>
+                <div style="height:6px;background:var(--bg3);border-radius:3px"><div style="height:100%;width:${(pct*100).toFixed(1)}%;background:${barColor(pct)};border-radius:3px;transition:width .3s"></div></div>
+              </div>`;
+            }).join('')}
+          </div>
+
+          <!-- Year over year -->
+          <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:16px">
+            <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;margin-bottom:12px">Cost by Year</div>
+            ${yearEntries.length===0?'<div style="color:var(--text-dim);font-size:13px">No dated records with costs yet.</div>':
+              yearEntries.map(([y,cost])=>{
+                const pct = cost/maxYear;
+                return `<div style="margin-bottom:8px">
+                  <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+                    <span style="font-family:'Share Tech Mono',monospace;color:var(--text-dim)">${y}</span>
+                    <span style="font-family:'Share Tech Mono',monospace;font-weight:700">$${cost.toLocaleString(undefined,{maximumFractionDigits:0})}</span>
+                  </div>
+                  <div style="height:6px;background:var(--bg3);border-radius:3px"><div style="height:100%;width:${(pct*100).toFixed(1)}%;background:#2563eb;border-radius:3px"></div></div>
+                </div>`;
+              }).join('')}
+          </div>
+        </div>
+
+        <!-- Equipment ranking -->
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:16px">
+          <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;margin-bottom:12px">Equipment Ranked by Total Maintenance Cost</div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr style="border-bottom:2px solid var(--border)">
+                <th style="text-align:left;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">#</th>
+                <th style="text-align:left;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">Equipment</th>
+                <th style="text-align:left;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">Customer</th>
+                <th style="text-align:center;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">Records</th>
+                <th style="text-align:right;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;color:var(--text-dim)">Total Cost</th>
+                <th style="padding:6px 10px;width:160px"></th>
+              </tr></thead>
+              <tbody>
+                ${vCosts.map((vc,idx)=>{
+                  const pct = vc.total/maxCost;
+                  const rank = idx+1;
+                  const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'';
+                  return `<tr style="border-bottom:1px solid var(--border);cursor:pointer" data-action="select" data-id="${esc(vc.v.id)}" onclick="appView='fleet';selectedId='${vc.v.id}';selectedCustomerId='${vc.v.customerId}';render()">
+                    <td style="padding:8px 10px;font-family:'Share Tech Mono',monospace;color:var(--text-dim)">${medal||rank}</td>
+                    <td style="padding:8px 10px">
+                      <div style="font-weight:600">${esc(vc.v.name)}</div>
+                      <div style="font-size:11px;color:var(--text-dim)">${[vc.v.year,vc.v.make,vc.v.model].filter(Boolean).join(' ')}</div>
+                    </td>
+                    <td style="padding:8px 10px;font-size:12px;color:var(--text-dim)">${esc(vc.cust?.name||'')}</td>
+                    <td style="padding:8px 10px;text-align:center;font-family:'Share Tech Mono',monospace">${vc.recs.length}</td>
+                    <td style="padding:8px 10px;text-align:right;font-family:'Share Tech Mono',monospace;font-weight:700;color:${pct>0.66?'#dc2626':pct>0.33?'#d97706':'#374151'}">$${vc.total.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+                    <td style="padding:8px 10px">
+                      <div style="height:8px;background:var(--bg3);border-radius:4px"><div style="height:100%;width:${(pct*100).toFixed(1)}%;background:${barColor(pct)};border-radius:4px"></div></div>
+                    </td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+    }
+
     function renderInvoices() {
       const invoices = (data.invoices||[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
       const customers = data.customers||[];
@@ -1805,13 +1942,24 @@
 
     function customerModalHTML(c) {
       return `<div class="modal-overlay" id="modal-bg">
-        <div class="modal">
+        <div class="modal" style="max-width:620px">
           <div class="modal-hdr">
             <div class="modal-title">${c?'Edit Customer':'Add Customer'}</div>
             <button class="modal-close" data-action="close-modal">✕</button>
           </div>
           <div class="modal-body">
-            <div class="form-group"><label class="form-lbl">Customer Name *</label><input id="f-cust-name" class="form-input" value="${esc(c?.name||'')}" placeholder="e.g. Mattson Bros" /></div>
+            <div class="form-row">
+              <div class="form-group form-full"><label class="form-lbl">Customer Name *</label><input id="f-cust-name" class="form-input" value="${esc(c?.name||'')}" placeholder="e.g. Mattson Bros" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Business Name</label><input id="f-cust-biz" class="form-input" value="${esc(c?.businessName||'')}" placeholder="Legal business name..." /></div>
+              <div class="form-group"><label class="form-lbl">Contact Person</label><input id="f-cust-contact" class="form-input" value="${esc(c?.contact||'')}" placeholder="Primary contact..." /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Phone</label><input id="f-cust-phone" class="form-input" type="tel" value="${esc(c?.phone||'')}" placeholder="(406) 555-0100" /></div>
+              <div class="form-group"><label class="form-lbl">Email</label><input id="f-cust-email" class="form-input" type="email" value="${esc(c?.email||'')}" placeholder="email@example.com" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Billing Address</label><textarea id="f-cust-addr" class="form-textarea" rows="2" placeholder="123 Main St&#10;Chester, MT 59522">${esc(c?.address||'')}</textarea></div>
             <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-cust-notes" class="form-textarea" placeholder="Optional notes...">${esc(c?.notes||'')}</textarea></div>
           </div>
           <div class="modal-footer">
@@ -2076,6 +2224,7 @@
         <div class="tab-bar">
           <button class="tab-btn${appView==='fleet'?' active':''}" data-action="tab-fleet">Fleet</button>
           <button class="tab-btn${appView==='report'?' active':''}" data-action="tab-report">Report</button>
+          <button class="tab-btn${appView==='costs'?' active':''}" data-action="tab-costs">Cost Analysis</button>
           ${getFeature('invoicing')?
           `<button class="tab-btn${appView==='invoices'?' active':''}" data-action="tab-invoices">Invoices${(data.invoices||[]).length>0?' ('+(data.invoices.length)+')':''}</button>`:''}
           ${getFeature('orderParts')?
@@ -2352,11 +2501,17 @@
       } else if (action==='save-customer') {
         const cname = document.getElementById('f-cust-name').value.trim();
         if(!cname){alert('Name is required.');return;}
-        const cnotes = document.getElementById('f-cust-notes').value;
+        const cnotes   = document.getElementById('f-cust-notes').value;
+        const cbiz     = document.getElementById('f-cust-biz')?.value?.trim()||'';
+        const ccontact = document.getElementById('f-cust-contact')?.value?.trim()||'';
+        const cphone   = document.getElementById('f-cust-phone')?.value?.trim()||'';
+        const cemail   = document.getElementById('f-cust-email')?.value?.trim()||'';
+        const caddr    = document.getElementById('f-cust-addr')?.value?.trim()||'';
         if(modalState.target) {
-          update({...data,customers:(data.customers||[]).map(c=>c.id===modalState.target.id?{...modalState.target,name:cname,notes:cnotes}:c)});
+          const custObj={...modalState.target,name:cname,notes:cnotes,businessName:cbiz,contact:ccontact,phone:cphone,email:cemail,address:caddr};
+          update({...data,customers:(data.customers||[]).map(c=>c.id===modalState.target.id?custObj:c)});
         } else {
-          const nc={id:uid(),name:cname,notes:cnotes};
+          const nc={id:uid(),name:cname,notes:cnotes,businessName:cbiz,contact:ccontact,phone:cphone,email:cemail,address:caddr};
           selectedCustomerId=nc.id;
           update({...data,customers:[...(data.customers||[]),nc]});
         }
@@ -2864,6 +3019,8 @@
         localStorage.removeItem(PIN_KEY); render();
       } else if (action==='tab-fleet') {
         appView='fleet'; render();
+      } else if (action==='tab-costs') {
+        appView='costs'; render();
       } else if (action==='tab-report') {
         appView='report'; render();
       } else if (action==='report-print') {
