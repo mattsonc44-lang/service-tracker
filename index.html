@@ -563,6 +563,7 @@
     let appView = 'fleet'; // fleet | report | invoices | vendors | orderhistory | globalsearch
     let selectedRecordIds = new Set();
     let selectedInvoiceIds = new Set();
+    let selectedOrderPartIds = new Set();
     let poFilters = {q:'', vendor:'', num:'', status:'', vehicle:''};
     let ohSearch = '';
     let globalSearch = '';
@@ -1168,6 +1169,7 @@
             <div class="overview-sub">${allParts.length} item${allParts.length!==1?'s':''}${activeFilters?' · <span style="color:var(--amber-dim)">'+activeFilters+' filter'+(activeFilters!==1?'s':'')+' active</span>':''}</div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            ${selectedOrderPartIds.size>0?`<span style="font-size:13px;color:var(--text-dim)">${selectedOrderPartIds.size} selected</span><button class="btn btn-ghost btn-sm" data-action="po-clear-sel">Clear</button><button class="btn btn-primary btn-sm" data-action="po-add-to-service">+ Add to Service</button>`:''}
             ${activeFilters?`<button class="btn btn-ghost btn-sm" data-action="po-clear-filters">Clear Filters</button>`:''}
             ${((data.partsToOrder||[]).filter(p=>!p.ordered&&!p.received).length>1)?`<button class='btn btn-ghost btn-sm' data-action='consolidate-orders'>Consolidate Duplicates</button>`:''}
             ${received>0?`<button class="btn btn-ghost btn-sm" data-action="move-to-history">Move Received to History</button>`:''}
@@ -1301,6 +1303,7 @@
                   const veh = p.vehicleId === '__stock__' ? {name:'📦 For Stock'} : (p.vehicleId ? (data.vehicles||[]).find(v=>v.id===p.vehicleId) : null);
                   return `<tr class="${rowClass}">
                     <td><span class="po-status-dot ${dotClass}"></span></td>
+                    <td><input type="checkbox" class="po-cb" data-action="po-toggle-sel" data-id="${esc(p.id)}" ${selectedOrderPartIds.has(p.id)?"checked":""} style="accent-color:var(--amber);cursor:pointer;width:15px;height:15px" /></td>
                     <td>${esc(p.vendor||'')}</td>
                     <td style="font-weight:600">${esc(p.desc||'')}</td>
                     <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
@@ -1940,6 +1943,72 @@
       </div>`;
     }
 
+
+    function addPartsToServiceModalHTML(orderParts) {
+      const customers = data.customers || [];
+      const vehicles  = data.vehicles  || [];
+      // Group vehicles by customer
+      const custGroups = customers.map(c=>({
+        c, vlist: vehicles.filter(v=>v.customerId===c.id).sort((a,b)=>a.name.localeCompare(b.name))
+      })).filter(g=>g.vlist.length>0);
+
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:660px">
+          <div class="modal-hdr">
+            <div class="modal-title">Add Parts to Service Record</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div style="margin-bottom:12px;padding:10px 14px;background:var(--bg3);border-radius:4px">
+              <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:6px">Parts to add (${orderParts.length})</div>
+              ${orderParts.map(p=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid var(--border)">
+                <span style="font-weight:600">${esc(p.desc||p.num||'Part')}</span>
+                <span style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</span>
+              </div>`).join('')}
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-lbl">Vehicle *</label>
+                <select id="f-ats-vehicle" class="form-select">
+                  <option value="">Select vehicle...</option>
+                  ${custGroups.map(g=>`
+                    <optgroup label="${esc(g.c.name)}">
+                      ${g.vlist.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}${v.year?' ('+v.year+')':''}</option>`).join('')}
+                    </optgroup>`).join('')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-lbl">Date *</label>
+                <input id="f-ats-date" class="form-input" type="date" value="${new Date().toISOString().slice(0,10)}" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-lbl">Service Type</label>
+                <input id="f-ats-type" class="form-input" list="svc-type-opts" placeholder="e.g. Repair, Oil Change..." autocomplete="off" />
+              </div>
+              <div class="form-group">
+                <label class="form-lbl">Hours / Miles</label>
+                <input id="f-ats-hours" class="form-input" type="number" placeholder="Current hours or miles" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Notes / Work Done</label>
+              <textarea id="f-ats-notes" class="form-textarea" placeholder="Describe the work performed..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Technician</label>
+              <input id="f-ats-tech" class="form-input" placeholder="Who performed the service..." />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-parts-to-service">Log Service</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
     function customerModalHTML(c) {
       return `<div class="modal-overlay" id="modal-bg">
         <div class="modal" style="max-width:620px">
@@ -2199,6 +2268,7 @@
         else if (modalState.type==='inv-part') modal = invPartModalHTML(modalState.target);
         else if (modalState.type==='vendor') modal = vendorModalHTML(modalState.target);
         else if (modalState.type==='receive-part') modal = receivePartModalHTML(modalState.target);
+        else if (modalState.type==='add-parts-to-svc') modal = addPartsToServiceModalHTML(modalState.parts);
         else if (modalState.type==='inv-dupes') modal = invDupesModalHTML();
         else if (modalState.type==='edit-order-part') modal = editOrderPartModalHTML(modalState.target);
       }
@@ -2826,6 +2896,56 @@
       } else if (action==='del-inv-part') {
         if(!confirm('Remove this part from inventory?'))return;
         update({...data,partsInventory:(data.partsInventory||[]).filter(p=>p.id!==id)});
+      } else if (action==='po-toggle-sel') {
+        if (selectedOrderPartIds.has(id)) selectedOrderPartIds.delete(id);
+        else selectedOrderPartIds.add(id);
+        render();
+      } else if (action==='po-clear-sel') {
+        selectedOrderPartIds.clear(); render();
+      } else if (action==='po-sel-all') {
+        const allIds = (data.partsToOrder||[]).map(p=>p.id);
+        if (selectedOrderPartIds.size === allIds.length) selectedOrderPartIds.clear();
+        else allIds.forEach(id=>selectedOrderPartIds.add(id));
+        render();
+      } else if (action==='po-add-to-service') {
+        const parts = [...selectedOrderPartIds].map(id=>(data.partsToOrder||[]).find(p=>p.id===id)).filter(Boolean);
+        if (!parts.length) return;
+        modalState = {type:'add-parts-to-svc', parts};
+        render();
+      } else if (action==='save-parts-to-service') {
+        const vehicleId = document.getElementById('f-ats-vehicle')?.value||'';
+        if (!vehicleId) { alert('Please select a vehicle.'); return; }
+        const date  = document.getElementById('f-ats-date')?.value||new Date().toISOString().slice(0,10);
+        const type  = document.getElementById('f-ats-type')?.value?.trim()||'Repair';
+        const notes = document.getElementById('f-ats-notes')?.value?.trim()||'';
+        const hours = document.getElementById('f-ats-hours')?.value?.trim()||'';
+        const tech  = document.getElementById('f-ats-tech')?.value?.trim()||'';
+        const parts = modalState.parts || [];
+        // Build parts array from selected order parts
+        const partsArr = parts.map(p=>({desc:p.desc||'',num:p.num||'',cost:p.unitCost||'',qtyUsed:p.qty||'1',invPartId:p.invPartId||''}));
+        const totalCost = partsArr.reduce((s,p)=>s+(parseFloat(p.cost)||0)*parseInt(p.qtyUsed||1),0);
+        // Update vehicle hours if higher
+        let vehicles = data.vehicles;
+        if (hours) {
+          vehicles = vehicles.map(v=>v.id===vehicleId&&Number(hours)>Number(v.hours||0)?{...v,hours}:v);
+        }
+        // Deduct from inventory
+        let partsInventory = data.partsInventory||[];
+        partsArr.forEach(function(p){
+          if(p.invPartId){
+            const qty=parseInt(p.qtyUsed)||1;
+            partsInventory=partsInventory.map(function(ip){
+              return ip.id===p.invPartId?{...ip,qty:String(Math.max(0,(parseInt(ip.qty)||0)-qty))}:ip;
+            });
+          }
+        });
+        const newRecord = {id:uid(),vehicleId,date,type,notes,tech,hours,parts:partsArr,cost:totalCost?String(totalCost):'',partnum:''};
+        selectedOrderPartIds.clear();
+        modalState=null;
+        // Navigate to that vehicle's service history
+        const v = data.vehicles.find(v=>v.id===vehicleId);
+        if (v) { appView='fleet'; selectedCustomerId=v.customerId; selectedId=vehicleId; }
+        update({...data, vehicles, partsInventory, records:[...data.records, newRecord]});
       } else if (action==='add-part-order') {
         const vendor = document.getElementById('po-vendor')?.value?.trim()||'';
         const desc   = document.getElementById('po-desc')?.value?.trim()||'';
