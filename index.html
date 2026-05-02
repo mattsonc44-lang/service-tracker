@@ -1973,7 +1973,7 @@
                   <option value="">Select vehicle...</option>
                   ${custGroups.map(g=>`
                     <optgroup label="${esc(g.c.name)}">
-                      ${g.vlist.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}${v.year?' ('+v.year+')':''}</option>`).join('')}
+                      ${g.vlist.map(v=>`<option value="${esc(v.id)}" ${(modalState.defaultVehicleId===v.id)?"selected":""}>${esc(v.name)}${v.year?' ('+v.year+')':''}</option>`).join('')}
                     </optgroup>`).join('')}
                 </select>
               </div>
@@ -2910,7 +2910,9 @@
       } else if (action==='po-add-to-service') {
         const parts = [...selectedOrderPartIds].map(id=>(data.partsToOrder||[]).find(p=>p.id===id)).filter(Boolean);
         if (!parts.length) return;
-        modalState = {type:'add-parts-to-svc', parts};
+        // Use vehicle from the first selected part that has one
+        const defaultVehId = parts.map(p=>p.vehicleId).find(v=>v&&v!=='__stock__')||'';
+        modalState = {type:'add-parts-to-svc', parts, defaultVehicleId:defaultVehId};
         render();
       } else if (action==='save-parts-to-service') {
         const vehicleId = document.getElementById('f-ats-vehicle')?.value||'';
