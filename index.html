@@ -2108,6 +2108,11 @@
     }
 
     // ── Render: Admin Tab ───────────────────────────────────────────────────
+
+    function getFeature(key) {
+      return !!(data.settings?.features?.[key] !== false && (data.settings?.features?.[key] || key === 'invoicing' || key === 'partsInventory' || key === 'orderParts'));
+    }
+
     function toggleRow(key, label, hint) {
       const on = getFeature(key);
       return `<div class="admin-toggle-row">
@@ -2908,7 +2913,7 @@
     // ── Firebase real-time sync ─────────────────────────────────────────────
     let dbRef = null;
     try {
-      const app = firebase.initializeApp(FIREBASE_CONFIG);
+      const app = firebase.initializeApp(firebaseConfig);
       const db  = firebase.database();
       dbRef = db.ref(DB_PATH);
 
