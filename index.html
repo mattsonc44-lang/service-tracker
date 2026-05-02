@@ -2323,6 +2323,14 @@
       } else if(action==='tab-search'){appView='search';render();
       } else if(action==='tab-admin'){appView='admin';render();
 
+
+      } else if(action==='select-customer'){
+        selectedCustomerId=id;selectedId='';sidebarSearch='';appView='fleet';render();
+      } else if(action==='back-to-customers'){
+        selectedCustomerId='';selectedId='';sidebarSearch='';appView='fleet';render();
+      } else if(action==='sidebar-search'){
+        sidebarSearch=el.value;render();
+        const si=document.getElementById('sidebar-search-input');if(si){si.focus();si.setSelectionRange&&si.setSelectionRange(si.value.length,si.value.length);}
       } else if(action==='select-vehicle'){
         const v=data.vehicles.find(v=>v.id===id);
         if(v){selectedId=v.id;selectedCustomerId=v.customerId;appView='fleet';render();}
@@ -2817,6 +2825,7 @@
 
     // ── Input events ────────────────────────────────────────────────────────
     document.getElementById('app').addEventListener('input', function(e) {
+      if(e.target.id==='sidebar-search-input'){sidebarSearch=e.target.value;render();const si=document.getElementById('sidebar-search-input');if(si){si.focus();}return;}
       if(e.target.id==='gs-input'){window._gsq=e.target.value;render();const el=document.getElementById('gs-input');if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}return;}
       if(e.target.id==='po-q'){poFilters['q']=e.target.value;render();return;}
       if(e.target.id==='inv-fq'){if(!window._invFilters)window._invFilters={q:'',vendor:'',location:''};window._invFilters.q=e.target.value;render();const el=document.getElementById('inv-fq');if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}return;}
