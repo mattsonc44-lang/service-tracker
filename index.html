@@ -1359,13 +1359,17 @@
 
     function renderPartsInventory() {
       const inv = (data.partsInventory || []);
-      const invF = window._invFilters || {q:'',vendor:'',location:''};
+      const invF = window._invFilters || {q:'',vendor:'',location:'',vehicle:''};
       const activeInvFilters = Object.values(invF).filter(Boolean).length;
 
       const filtered = inv.filter(p=>{
-        if(invF.q && !(p.name+(p.notes||'')+(p.partNumbers||[]).map(n=>n.num+n.vendor).join(' ')).toLowerCase().includes(invF.q.toLowerCase())) return false;
+        if(invF.q) {
+          const vNames=(p.vehicleIds||[]).map(vid=>{const v=(data.vehicles||[]).find(v=>v.id===vid);return v?v.name+' '+v.make+' '+v.model:''}).join(' ');
+          if(!(p.name+(p.notes||'')+(p.partNumbers||[]).map(n=>n.num+n.vendor).join(' ')+vNames).toLowerCase().includes(invF.q.toLowerCase())) return false;
+        }
         if(invF.vendor && !(p.partNumbers||[]).some(n=>(n.vendor||'').toLowerCase()===invF.vendor.toLowerCase())) return false;
         if(invF.location && (p.location||'').toLowerCase()!==(invF.location||'').toLowerCase()) return false;
+        if(invF.vehicle && !(p.vehicleIds||[]).includes(invF.vehicle)) return false;
         return true;
       }).sort((a,b)=>a.name.localeCompare(b.name));
 
@@ -2686,7 +2690,7 @@
         const inv=(data.partsInventory||[]).map(p=>p.id===id?{...p,partNumbers:(p.partNumbers||[]).filter(n=>n.id!==nid)}:p);
         update({...data,partsInventory:inv});
       } else if(action==='inv-find-dupes'){alert('Duplicate detection is now handled within each item\'s part numbers.');
-      } else if(action==='inv-clear-filters'){window._invFilters={q:'',vendor:'',location:''};render();
+      } else if(action==='inv-clear-filters'){window._invFilters={q:'',vendor:'',location:'',vehicle:''};render();
 
       } else if(action==='toggle-todo-section'){
         window['_todoOpen_'+id]=(window['_todoOpen_'+id]===false)?true:false;render();
@@ -2851,7 +2855,7 @@
         if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(pos,pos);}
         return;
       }
-      if(e.target.id==='inv-fq'){if(!window._invFilters)window._invFilters={q:'',vendor:'',location:''};window._invFilters.q=e.target.value;render();const el=document.getElementById('inv-fq');if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}return;}
+      if(e.target.id==='inv-fq'){if(!window._invFilters)window._invFilters={q:'',vendor:'',location:'',vehicle:''};window._invFilters.q=e.target.value;render();const el=document.getElementById('inv-fq');if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}return;}
       if(e.target.classList&&e.target.classList.contains('part-num-input'))showPP(e.target,'num');
       if(e.target.classList&&e.target.classList.contains('part-desc-input'))showPP(e.target,'desc');
     },true);
