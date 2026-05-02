@@ -2238,6 +2238,8 @@
         </div>
         ${appView==='report'
           ? `<div class="main"><div class="main-content">${renderReport()}</div></div>`
+          : appView==='costs'
+          ? `<div class="main"><div class="main-content">${renderCostAnalysis()}</div></div>`
           : appView==='invoices'
           ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
           : appView==='parts'
