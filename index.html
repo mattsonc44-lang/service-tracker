@@ -2054,7 +2054,7 @@
             <input id="po-new-num" class="form-input" placeholder="Part #" list="inv-num-list-po" autocomplete="off" />
             <datalist id="inv-num-list-po">${(data.partsInventory||[]).flatMap(p=>(p.partNumbers||[]).filter(n=>n.num).map(n=>({name:p.name,num:n.num}))).sort((a,b)=>a.num.localeCompare(b.num)).map(p=>`<option value="${esc(p.num)}">${esc(p.name)}</option>`).join('')}</datalist>
           </div>
-          <div class="form-group" style="flex:1"><label class="form-lbl">Vendor</label><input id="po-new-vendor" class="form-input" placeholder="Vendor" /></div>
+          <div class="form-group" style="flex:1"><label class="form-lbl">Vendor</label><input id="po-new-vendor" class="form-input" placeholder="Vendor" list="po-vendor-list" autocomplete="off" /><datalist id="po-vendor-list">${(data.vendors||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.name)}"></option>`).join('')}</datalist></div>
           <div class="form-group" style="flex:none;width:70px"><label class="form-lbl">Qty</label><input id="po-new-qty" class="form-input" type="number" placeholder="1" min="1" /></div>
           <div class="form-group" style="flex:1"><label class="form-lbl">Vehicle</label>
             <select id="po-new-vehicle" class="form-select">
