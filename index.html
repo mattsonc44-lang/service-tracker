@@ -1534,3 +1534,1432 @@
     }
 
 
+
+    // ── Receive Part Modal ──────────────────────────────────────────────────
+    function receivePartModalHTML(orderItem) {
+      const existingLocs = [...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))].sort();
+      const defaultCost = orderItem.unitCost||'';
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:520px">
+          <div class="modal-hdr">
+            <div class="modal-title">Receive Part</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div style="margin-bottom:14px;padding:10px 14px;background:var(--bg3);border-radius:4px">
+              <div style="font-family:'Rajdhani',sans-serif;font-weight:700;font-size:17px">${esc(orderItem.desc||'')}</div>
+              ${orderItem.num?`<div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--amber-dim)">${esc(orderItem.num)}</div>`:''}
+              ${orderItem.vendor?`<div style="font-size:13px;color:var(--text-dim)">${esc(orderItem.vendor)}</div>`:''}
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Unit Cost</label><input id="f-recv-cost" class="form-input" type="number" value="${esc(defaultCost)}" placeholder="$0.00" min="0" step="0.01" /></div>
+              <div class="form-group"><label class="form-lbl">Qty Received</label><input id="f-recv-qty" class="form-input" type="number" value="${esc(orderItem.qty||'1')}" min="1" /></div>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Storage Location</label>
+              <input id="f-recv-location" class="form-input" list="recv-loc-list" placeholder="Select or type location..." autocomplete="off" />
+              <datalist id="recv-loc-list">${existingLocs.map(l=>`<option value="${esc(l)}"></option>`).join('')}</datalist>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-receive">✓ Receive</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Add Parts to Service Modal ─────────────────────────────────────────
+    function addPartsToServiceModalHTML(orderParts) {
+      const customers = data.customers || [];
+      const vehicles  = data.vehicles  || [];
+      const custGroups = customers.map(c=>({c, vlist:vehicles.filter(v=>v.customerId===c.id).sort((a,b)=>a.name.localeCompare(b.name))})).filter(g=>g.vlist.length>0);
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:660px">
+          <div class="modal-hdr">
+            <div class="modal-title">Add Parts to Service Record</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            <div style="margin-bottom:12px;padding:10px 14px;background:var(--bg3);border-radius:4px">
+              <div style="font-family:'Share Tech Mono',monospace;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Parts to add — set qty used for each</div>
+              <table style="width:100%;border-collapse:collapse;font-size:13px">
+                <thead><tr style="border-bottom:1px solid var(--border)">
+                  <th style="text-align:left;padding:4px 8px;font-size:10px;color:var(--text-dim)">Description</th>
+                  <th style="text-align:left;padding:4px 8px;font-size:10px;color:var(--text-dim)">Part #</th>
+                  <th style="text-align:center;padding:4px 8px;font-size:10px;color:var(--text-dim)">On Order</th>
+                  <th style="text-align:center;padding:4px 8px;font-size:10px;color:var(--text-dim)">Qty Used *</th>
+                </tr></thead>
+                <tbody>
+                  ${orderParts.map((p,idx)=>`<tr style="border-bottom:1px solid var(--bg3)">
+                    <td style="padding:6px 8px;font-weight:600">${esc(p.desc||'')}</td>
+                    <td style="padding:6px 8px;font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
+                    <td style="padding:6px 8px;text-align:center">${p.qty||'1'}</td>
+                    <td style="padding:6px 8px;text-align:center"><input type="number" class="form-input ats-qty-input" data-part-idx="${idx}" min="0" value="${p.qty||'1'}" style="width:70px;padding:4px 8px;text-align:center" /></td>
+                  </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Vehicle *</label>
+                <select id="f-ats-vehicle" class="form-select">
+                  <option value="">Select vehicle...</option>
+                  ${custGroups.map(g=>`<optgroup label="${esc(g.c.name)}">${g.vlist.map(v=>`<option value="${esc(v.id)}" ${(modalState.defaultVehicleId===v.id)?'selected':''}>${esc(v.name)}${v.year?' ('+v.year+')':''}</option>`).join('')}</optgroup>`).join('')}
+                </select>
+              </div>
+              <div class="form-group"><label class="form-lbl">Date *</label><input id="f-ats-date" class="form-input" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Service Type</label><input id="f-ats-type" class="form-input" list="svc-type-opts" placeholder="e.g. Repair..." autocomplete="off" /></div>
+              <div class="form-group"><label class="form-lbl">Hours / Miles</label><input id="f-ats-hours" class="form-input" type="number" placeholder="Current hours" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Notes / Work Done</label><textarea id="f-ats-notes" class="form-textarea" placeholder="Describe the work performed..."></textarea></div>
+            <div class="form-group"><label class="form-lbl">Technician</label><input id="f-ats-tech" class="form-input" placeholder="Who performed the service..." /></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-parts-to-service">Log Service</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Todo Modal ──────────────────────────────────────────────────────────
+    function todoModalHTML(v, todo) {
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr"><div class="modal-title">${todo?'Edit Task':'Add Task'}</div><button class="modal-close" data-action="close-modal">✕</button></div>
+          <div class="modal-body">
+            <div class="form-group"><label class="form-lbl">Task *</label><input id="f-todo-text" class="form-input" value="${esc(todo?.text||'')}" placeholder="What needs to be done?" /></div>
+            <div class="form-group"><label class="form-lbl">Priority</label>
+              <select id="f-todo-pri" class="form-select">
+                <option value="high" ${todo?.priority==='high'?'selected':''}>🔴 High</option>
+                <option value="medium" ${!todo?.priority||todo?.priority==='medium'?'selected':''}>🟡 Medium</option>
+                <option value="low" ${todo?.priority==='low'?'selected':''}>🟢 Low</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-todo-notes" class="form-textarea" placeholder="Additional details...">${esc(todo?.notes||'')}</textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-todo">Save Task</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Customer Modal ──────────────────────────────────────────────────────
+    function customerModalHTML(c) {
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:620px">
+          <div class="modal-hdr"><div class="modal-title">${c?'Edit Customer':'Add Customer'}</div><button class="modal-close" data-action="close-modal">✕</button></div>
+          <div class="modal-body">
+            <div class="form-group"><label class="form-lbl">Customer Name *</label><input id="f-cust-name" class="form-input" value="${esc(c?.name||'')}" placeholder="e.g. Mattson Bros" /></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Business Name</label><input id="f-cust-biz" class="form-input" value="${esc(c?.businessName||'')}" placeholder="Legal business name..." /></div>
+              <div class="form-group"><label class="form-lbl">Contact Person</label><input id="f-cust-contact" class="form-input" value="${esc(c?.contact||'')}" placeholder="Primary contact..." /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Phone</label><input id="f-cust-phone" class="form-input" type="tel" value="${esc(c?.phone||'')}" placeholder="(406) 555-0100" /></div>
+              <div class="form-group"><label class="form-lbl">Email</label><input id="f-cust-email" class="form-input" type="email" value="${esc(c?.email||'')}" placeholder="email@example.com" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Billing Address</label><textarea id="f-cust-addr" class="form-textarea" rows="2" placeholder="123 Main St&#10;Chester, MT 59522">${esc(c?.address||'')}</textarea></div>
+            <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-cust-notes" class="form-textarea" placeholder="Optional notes...">${esc(c?.notes||'')}</textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-customer">${c?'Save Changes':'Add Customer'}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Vehicle Modal ───────────────────────────────────────────────────────
+    function vehicleModalHTML(v) {
+      const customers = data.customers||[];
+      const locs = [...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))];
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:620px">
+          <div class="modal-hdr"><div class="modal-title">${v?'Edit Equipment':'Add Equipment'}</div><button class="modal-close" data-action="close-modal">✕</button></div>
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group form-full"><label class="form-lbl">Equipment Name *</label><input id="f-veh-name" class="form-input" value="${esc(v?.name||'')}" placeholder="e.g. Kenworth, MT865" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Type</label>
+                <select id="f-veh-type" class="form-select">
+                  ${EQUIPMENT_TYPES.map(t=>`<option value="${t}" ${v?.type===t?'selected':''}>${t}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group"><label class="form-lbl">Customer</label>
+                <select id="f-veh-cust" class="form-select">
+                  <option value="">-- No customer --</option>
+                  ${customers.map(c=>`<option value="${esc(c.id)}" ${v?.customerId===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Year</label><input id="f-veh-year" class="form-input" value="${esc(v?.year||'')}" placeholder="e.g. 2018" /></div>
+              <div class="form-group"><label class="form-lbl">Make</label><input id="f-veh-make" class="form-input" value="${esc(v?.make||'')}" placeholder="e.g. Caterpillar" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Model</label><input id="f-veh-model" class="form-input" value="${esc(v?.model||'')}" placeholder="e.g. MT865 B" /></div>
+              <div class="form-group"><label class="form-lbl">VIN / Serial #</label><input id="f-veh-vin" class="form-input" value="${esc(v?.vin||'')}" placeholder="VIN or serial number" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Engine</label><input id="f-veh-engine" class="form-input" value="${esc(v?.engine||'')}" placeholder="e.g. C-16, Cummins ISX" /></div>
+              <div class="form-group"><label class="form-lbl">HP</label><input id="f-veh-hp" class="form-input" type="number" value="${esc(v?.hp||'')}" placeholder="e.g. 475" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Hours / Miles</label><input id="f-veh-hours" class="form-input" type="number" value="${esc(v?.hours||'')}" placeholder="Current meter reading" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-veh-notes" class="form-textarea" placeholder="Engine info, specs, etc.">${esc(v?.notes||'')}</textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-vehicle">${v?'Save Changes':'Add Equipment'}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Record Modal ────────────────────────────────────────────────────────
+    function recordModalHTML(r) {
+      const existingPartsJson = r ? JSON.stringify(getPartsArray(r)) : '[]';
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:680px">
+          <div class="modal-hdr"><div class="modal-title">${r?'Edit Service Record':'Log Service'}</div><button class="modal-close" data-action="close-modal">✕</button></div>
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Date *</label><input id="f-date" class="form-input" type="date" value="${esc(r?.date||new Date().toISOString().slice(0,10))}" /></div>
+              <div class="form-group"><label class="form-lbl">Service Type *</label><input id="f-type" class="form-input" list="svc-type-opts" value="${esc(r?.type||'')}" placeholder="Type or select..." autocomplete="off" /><datalist id="svc-type-opts">${SERVICE_TYPES.map(t=>`<option value="${t}"></option>`).join('')}</datalist></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Cost ($)</label><input id="f-cost" class="form-input" type="number" value="${esc(r?.cost||'0.00')}" placeholder="0.00" step="0.01" min="0" /></div>
+              <div class="form-group"><label class="form-lbl">Hours / Miles at Service</label><input id="f-hours" class="form-input" type="number" value="${esc(r?.hours||'0')}" placeholder="0" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Performed By</label><input id="f-tech" class="form-input" value="${esc(r?.tech||'')}" placeholder="Self, Dealer, Shop..." /></div>
+            <div class="form-group"><label class="form-lbl">Parts Used</label>
+              <div id="parts-list">
+                ${(()=>{const pa=r?getPartsArray(r):[];return(pa.length?pa:
+                  [{desc:'',num:'',qty:'1',cost:'',invPartId:'',pnId:''}]).map((p,i)=>
+                  `<div class="part-entry" data-inv-id="${esc(p.invPartId||'')}" data-pn-id="${esc(p.pnId||'')}">
+                    <div class="part-inv-wrap"><input class="part-desc-input" placeholder="Search or type new part..." value="${esc(p.desc||'')}" autocomplete="off" /></div>
+                    <div class="part-inv-wrap"><input class="part-num-input" placeholder="Part #" value="${esc(p.num||'')}" autocomplete="off" /></div>
+                    <input class="part-qty-input form-input" type="number" placeholder="1" value="${esc(p.qty||'1')}" min="0" style="width:60px" />
+                    <input class="part-cost-input form-input" type="number" placeholder="Cost $" value="${esc(p.cost||'')}" step="0.01" min="0" style="width:90px" />
+                    <button class="part-remove-btn" data-action="remove-part" data-idx="${i}">✕</button>
+                  </div>`).join('')})()}
+              </div>
+              <button class="btn btn-ghost btn-sm" data-action="add-part" style="margin-top:8px">+ Add Another Part</button>
+            </div>
+            <div class="form-group"><label class="form-lbl">Notes / Parts Used</label><textarea id="f-notes" class="form-textarea" placeholder="Work done, parts replaced...">${esc(getCleanNotes(r||{}))}</textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-record">${r?'Save Changes':'Log Service'}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Vendor Modal ────────────────────────────────────────────────────────
+    function vendorModalHTML(v) {
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr"><div class="modal-title">${v?'Edit Vendor':'Add Vendor'}</div><button class="modal-close" data-action="close-modal">✕</button></div>
+          <div class="modal-body">
+            <div class="form-group"><label class="form-lbl">Vendor Name *</label><input id="f-vnd-name" class="form-input" value="${esc(v?.name||'')}" placeholder="e.g. NAPA Auto Parts" /></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Phone</label><input id="f-vnd-phone" class="form-input" value="${esc(v?.phone||'')}" placeholder="(406) 555-0100" /></div>
+              <div class="form-group"><label class="form-lbl">Catalog URL</label><input id="f-vnd-url" class="form-input" value="${esc(v?.catalogUrl||'')}" placeholder="https://..." /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Address</label><textarea id="f-vnd-addr" class="form-textarea" rows="2" placeholder="Street address...">${esc(v?.address||'')}</textarea></div>
+            <div class="form-group"><label class="form-lbl">Notes</label><textarea id="f-vnd-notes" class="form-textarea" placeholder="Account info, contact notes...">${esc(v?.notes||'')}</textarea></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-vendor">${v?'Save Changes':'Add Vendor'}</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    // ── Render: Fleet Tab ───────────────────────────────────────────────────
+    function renderFleet() {
+      const customers = data.customers||[];
+      const vehicles  = data.vehicles||[];
+      const selCust   = customers.find(c=>c.id===selectedCustomerId);
+      const selVeh    = vehicles.find(v=>v.id===selectedId);
+      const sidebar   = renderSidebar();
+
+      if (selVeh) {
+        return `<div class="layout"><div class="sidebar">${sidebar}</div><div class="main"><div class="main-content">${renderDetail(selVeh)}</div></div></div>`;
+      }
+      if (selCust) {
+        const custVehicles = vehicles.filter(v=>v.customerId===selCust.id);
+        return `<div class="layout"><div class="sidebar">${sidebar}</div><div class="main"><div class="main-content">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div>
+              <div class="overview-title">${esc(selCust.name)}</div>
+              <div class="overview-sub">Fleet overview for ${esc(selCust.name)}.</div>
+              ${(selCust.businessName||selCust.contact||selCust.phone||selCust.email||selCust.address)?`
+              <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-top:8px;display:flex;flex-wrap:wrap;gap:16px">
+                ${selCust.businessName?`<div><div style="font-size:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)">Business</div><div style="font-size:14px;font-weight:600">${esc(selCust.businessName)}</div></div>`:''}
+                ${selCust.contact?`<div><div style="font-size:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)">Contact</div><div style="font-size:14px">${esc(selCust.contact)}</div></div>`:''}
+                ${selCust.phone?`<div><div style="font-size:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)">Phone</div><div style="font-size:14px"><a href="tel:${esc(selCust.phone)}" style="color:var(--amber-dim);text-decoration:none">${esc(selCust.phone)}</a></div></div>`:''}
+                ${selCust.email?`<div><div style="font-size:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)">Email</div><div style="font-size:14px"><a href="mailto:${esc(selCust.email)}" style="color:var(--amber-dim);text-decoration:none">${esc(selCust.email)}</a></div></div>`:''}
+                ${selCust.address?`<div><div style="font-size:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim)">Billing Address</div><div style="font-size:13px;white-space:pre-line">${esc(selCust.address)}</div></div>`:''}
+              </div>`:``}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-ghost btn-sm no-print" data-action="edit-customer" data-id="${esc(selCust.id)}">Edit Customer</button>
+              <button class="btn btn-danger btn-sm no-print" data-action="del-customer" data-id="${esc(selCust.id)}">Delete Customer</button>
+              <button class="btn btn-primary btn-sm no-print" data-action="add-vehicle">+ Add Equipment</button>
+            </div>
+          </div>
+          ${custVehicles.length===0?
+            `<div class="empty"><div class="empty-icon">🚜</div><div class="empty-title">No Equipment</div></div>`:
+            `<div style="display:flex;flex-direction:column;gap:10px">${custVehicles.map(v=>{
+              const recs=data.records.filter(r=>r.vehicleId===v.id);
+              const lastRec=recs.sort((a,b)=>b.date.localeCompare(a.date))[0];
+              const openTodos=(v.todos||[]).filter(t=>!t.done).length;
+              return `<div class="vc" data-action="select-vehicle" data-id="${esc(v.id)}" style="cursor:pointer">
+                <div class="vc-icon">${ICONS[v.type]||'🔧'}</div>
+                <div class="vc-info">
+                  <div class="vc-name">${esc(v.name)}</div>
+                  <div class="vc-sub">${esc(v.type)}${v.year?' · '+v.year:''}</div>
+                  ${lastRec?`<div class="vc-sub" style="font-size:11px">Last: ${lastRec.date} — ${esc(lastRec.type)}</div>`:''}
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+                  ${recs.length?`<span class="si-count">${recs.length}</span>`:''}
+                  ${openTodos>0?`<span style="font-size:10px;font-family:'Share Tech Mono',monospace;background:rgba(220,38,38,.1);color:#dc2626;padding:1px 5px;border-radius:8px">${openTodos}★</span>`:''}
+                </div>
+              </div>`;
+            }).join('')}</div>`}
+        </div></div></div>`;
+      }
+      // No selection — show overview
+      return `<div class="layout"><div class="sidebar">${sidebar}</div><div class="main"><div class="main-content">${renderOverview()}</div></div></div>`;
+    }
+
+    // ── Render: Report Tab ──────────────────────────────────────────────────
+    function renderReport() {
+      const records  = data.records||[];
+      const vehicles = data.vehicles||[];
+      const totalRecs = records.length;
+      const recentCutoff = new Date(); recentCutoff.setDate(recentCutoff.getDate()-30);
+      const recentRecs = records.filter(r=>new Date(r.date)>=recentCutoff).length;
+      const typeCounts = {};
+      records.forEach(r=>{typeCounts[r.type||'Other']=(typeCounts[r.type||'Other']||0)+1;});
+      const topTypes = Object.entries(typeCounts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+      const maxCount = topTypes[0]?.[1]||1;
+      return `
+        <div class="overview-title">Service Report</div>
+        <div class="overview-sub">${totalRecs} total records across ${vehicles.length} equipment</div>
+        <div class="summary-bar" style="margin:16px 0">
+          <div class="summary-stat"><div class="summary-stat-val">${totalRecs}</div><div class="summary-stat-lbl">Total Records</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${recentRecs}</div><div class="summary-stat-lbl">Last 30 Days</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${vehicles.length}</div><div class="summary-stat-lbl">Equipment</div></div>
+          <div class="summary-stat"><div class="summary-stat-val">${(data.customers||[]).length}</div><div class="summary-stat-lbl">Customers</div></div>
+        </div>
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:16px">
+          <div style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;margin-bottom:12px">Service Types</div>
+          ${topTypes.map(([t,c])=>{
+            const pct=c/maxCount;
+            return `<div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px">
+                <span style="color:var(--text-dim)">${esc(t)}</span>
+                <span style="font-family:'Share Tech Mono',monospace;font-weight:700">${c}</span>
+              </div>
+              <div style="height:6px;background:var(--bg3);border-radius:3px"><div style="height:100%;width:${(pct*100).toFixed(1)}%;background:var(--amber);border-radius:3px"></div></div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    }
+
+    // ── Render: Vendors Tab ─────────────────────────────────────────────────
+    function renderVendors() {
+      const vendors = data.vendors||[];
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div><div class="overview-title">Vendors</div><div class="overview-sub">${vendors.length} vendor${vendors.length!==1?'s':''}</div></div>
+          <button class="btn btn-primary btn-sm" data-action="add-vendor">+ Add Vendor</button>
+        </div>
+        ${vendors.length===0?`<div class="empty"><div class="empty-icon">🏪</div><div class="empty-title">No Vendors</div><div style="font-size:14px">Add vendors to track parts sources and contacts.</div></div>`:
+          vendors.map(v=>`<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <div>
+                <div style="font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700">${esc(v.name)}</div>
+                ${v.phone?`<div style="font-size:13px"><a href="tel:${esc(v.phone)}" style="color:var(--amber-dim);text-decoration:none">${esc(v.phone)}</a></div>`:''}
+                ${v.address?`<div style="font-size:13px;color:var(--text-dim)">${esc(v.address)}</div>`:''}
+                ${v.catalogUrl?`<div style="font-size:13px"><a href="${esc(v.catalogUrl)}" target="_blank" style="color:var(--amber-dim)">View Catalog</a></div>`:''}
+                ${v.notes?`<div style="font-size:13px;color:var(--text-dim);font-style:italic">${esc(v.notes)}</div>`:''}
+              </div>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-ghost btn-sm" data-action="edit-vendor" data-id="${esc(v.id)}">Edit</button>
+                <button class="btn btn-danger btn-sm" data-action="del-vendor" data-id="${esc(v.id)}">Delete</button>
+              </div>
+            </div>
+          </div>`).join('')}`;
+    }
+
+    // ── Render: Order History Tab ───────────────────────────────────────────
+    function renderOrderHistory() {
+      const hist = (data.orderHistory||[]).sort((a,b)=>b.receivedDate.localeCompare(a.receivedDate));
+      return `
+        <div><div class="overview-title">Order History</div><div class="overview-sub">${hist.length} received item${hist.length!==1?'s':''}</div></div>
+        ${hist.length===0?`<div class="empty"><div class="empty-icon">📦</div><div class="empty-title">No Order History</div></div>`:
+          `<div style="margin-top:16px">${hist.map(h=>`<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div>
+              <div style="font-weight:600;font-size:15px">${esc(h.desc||h.num||'Part')}</div>
+              <div style="font-size:12px;color:var(--text-dim)">${esc(h.vendor||'')}${h.num?' · #'+h.num:''}</div>
+              ${h.receivedLocation?`<div style="font-size:12px;color:var(--text-dim)">📍 ${esc(h.receivedLocation)}</div>`:''}
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--text-dim)">${h.receivedDate||''}</div>
+              <div style="font-size:13px">Qty: ${h.qty||'1'}${h.unitCost?' · $'+Number(h.unitCost).toFixed(2):''}</div>
+            </div>
+          </div>`).join('')}</div>`}`;
+    }
+
+    // ── Render: Global Search Tab ───────────────────────────────────────────
+    function renderGlobalSearch() {
+      const q = (window._gsq||'').trim().toLowerCase();
+      let results = [];
+      if (q.length >= 2) {
+        const vehicles = data.vehicles||[];
+        const records  = data.records||[];
+        const inv      = data.partsInventory||[];
+        // Records
+        records.filter(r=>(r.notes+r.type+r.partnum+(r.parts||[]).map(p=>p.desc+p.num).join('')).toLowerCase().includes(q))
+          .slice(0,20).forEach(r=>{
+            const v=vehicles.find(v=>v.id===r.vehicleId);
+            results.push({type:'record',label:`${v?.name||'?'} — ${r.type} (${r.date})`,sub:r.notes?.slice(0,80),id:r.vehicleId,custId:v?.customerId});
+          });
+        // Vehicles
+        vehicles.filter(v=>(v.name+v.make+v.model+v.vin+v.notes).toLowerCase().includes(q))
+          .slice(0,10).forEach(v=>results.push({type:'vehicle',label:v.name,sub:`${v.type}${v.year?' · '+v.year:''}`,id:v.id,custId:v.customerId}));
+        // Parts inventory
+        inv.filter(p=>(p.name+(p.partNumbers||[]).map(n=>n.num+n.vendor).join('')).toLowerCase().includes(q))
+          .slice(0,10).forEach(p=>results.push({type:'part',label:p.name,sub:`Qty: ${p.qty||'?'}${p.location?' · '+p.location:''}`}));
+      }
+      return `
+        <div class="overview-title" style="margin-bottom:12px">🔍 Search</div>
+        <input id="gs-input" class="form-input" value="${esc(window._gsq||'')}" placeholder="Search records, vehicles, parts..." data-action="gs-search" autocomplete="off" style="font-size:16px;padding:12px 14px;margin-bottom:16px" />
+        ${q.length>=2?`<div class="overview-sub" style="margin-bottom:12px">${results.length} result${results.length!==1?'s':''} for "${esc(q)}"</div>`:q?`<div class="overview-sub" style="margin-bottom:8px">Type at least 2 characters...</div>`:''}
+        ${results.map(r=>`<div style="background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:8px;${r.id?'cursor:pointer':''}" ${r.id?`data-action="gs-nav" data-id="${esc(r.id)}" data-cust-id="${esc(r.custId||'')}"`:''}">
+          <div style="font-size:11px;font-family:'Share Tech Mono',monospace;color:var(--amber-dim);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px">${r.type}</div>
+          <div style="font-weight:600">${esc(r.label)}</div>
+          ${r.sub?`<div style="font-size:13px;color:var(--text-dim)">${esc(r.sub)}</div>`:''}
+        </div>`).join('')}`;
+    }
+
+    // ── Render: Order Parts Tab ─────────────────────────────────────────────
+    function renderPartsToOrder() {
+      const allParts = data.partsToOrder||[];
+      const pf = poFilters;
+      const filtered = allParts.filter(p=>{
+        if(pf.q && !(p.desc+p.num+p.vendor).toLowerCase().includes(pf.q.toLowerCase())) return false;
+        if(pf.vendor && (p.vendor||'').toLowerCase()!==(pf.vendor).toLowerCase()) return false;
+        if(pf.num && (p.num||'').toLowerCase()!==pf.num.toLowerCase()) return false;
+        if(pf.vehicle && p.vehicleId!==pf.vehicle) return false;
+        if(pf.status==='needed' && (p.ordered||p.received)) return false;
+        if(pf.status==='ordered' && (!p.ordered||p.received)) return false;
+        if(pf.status==='received' && !p.received) return false;
+        return true;
+      }).sort((a,b)=>(b.id||'').localeCompare(a.id||''));
+
+      const vendors = [...new Set(allParts.map(p=>p.vendor).filter(Boolean))].sort();
+      const allNums = [...new Set(allParts.map(p=>p.num).filter(Boolean))].sort();
+      const allVehicles = (data.vehicles||[]).filter(v=>allParts.some(p=>p.vehicleId===v.id)).sort((a,b)=>a.name.localeCompare(b.name));
+      const needed   = allParts.filter(p=>!p.ordered&&!p.received).length;
+      const ordered  = allParts.filter(p=>p.ordered&&!p.received).length;
+      const received = allParts.filter(p=>p.received).length;
+
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="overview-title">Order Parts</div>
+            <div class="overview-sub">${needed} needed · ${ordered} on order · ${received} received</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            ${selectedOrderPartIds.size>0?`<span style="font-size:13px;color:var(--text-dim)">${selectedOrderPartIds.size} selected</span><button class="btn btn-ghost btn-sm" data-action="po-clear-sel">Clear</button><button class="btn btn-primary btn-sm" data-action="po-add-to-service">+ Add to Service</button>`:''}
+            <button class="btn btn-ghost btn-sm" data-action="inv-select-all-po">Select All</button>
+            <button class="btn btn-ghost btn-sm" data-action="consolidate-dupes">Consolidate Dupes</button>
+            <button class="btn btn-ghost btn-sm" data-action="move-received">Archive Received</button>
+          </div>
+        </div>
+        <!-- Filter bar -->
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:12px 14px;background:var(--panel);border:1px solid var(--border);border-radius:6px;align-items:flex-end;position:sticky;top:0;z-index:10">
+          <div style="min-width:160px;flex:2">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Keyword</label>
+            <input id="po-q" class="form-input" style="padding:6px 8px" placeholder="Search parts..." value="${esc(pf.q||'')}" autocomplete="off" />
+          </div>
+          <div style="min-width:120px;flex:1">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Vendor</label>
+            <div class="cs-wrap" data-cs="po-vendor">
+              <div class="cs-display" data-action="cs-open" data-cs="po-vendor">${pf.vendor||'All Vendors'}</div>
+              <div class="cs-dropdown" id="cs-po-vendor" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="po-vendor" />
+                <div class="cs-option${!pf.vendor?' selected':''}" data-action="cs-pick" data-cs="po-vendor" data-field="vendor" data-val="">All Vendors</div>
+                ${vendors.map(v=>`<div class="cs-option${pf.vendor===v?' selected':''}" data-action="cs-pick" data-cs="po-vendor" data-field="vendor" data-val="${esc(v)}">${esc(v)}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div style="min-width:120px;flex:1">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Part #</label>
+            <div class="cs-wrap" data-cs="po-num">
+              <div class="cs-display" data-action="cs-open" data-cs="po-num">${pf.num||'All Part #s'}</div>
+              <div class="cs-dropdown" id="cs-po-num" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="po-num" />
+                <div class="cs-option${!pf.num?' selected':''}" data-action="cs-pick" data-cs="po-num" data-field="num" data-val="">All Part #s</div>
+                ${allNums.map(n=>`<div class="cs-option${pf.num===n?' selected':''}" data-action="cs-pick" data-cs="po-num" data-field="num" data-val="${esc(n)}">${esc(n)}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div style="min-width:130px;flex:1">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Vehicle</label>
+            <div class="cs-wrap" data-cs="po-vehicle">
+              <div class="cs-display" data-action="cs-open" data-cs="po-vehicle">${pf.vehicle?(data.vehicles||[]).find(v=>v.id===pf.vehicle)?.name||'?':'All Vehicles'}</div>
+              <div class="cs-dropdown" id="cs-po-vehicle" style="display:none">
+                <input class="cs-search" placeholder="Type to search..." data-cs-search="po-vehicle" />
+                <div class="cs-option${!pf.vehicle?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="">All Vehicles</div>
+                ${allVehicles.map(v=>`<div class="cs-option${pf.vehicle===v.id?' selected':''}" data-action="cs-pick" data-cs="po-vehicle" data-field="vehicle" data-val="${esc(v.id)}">${esc(v.name)}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div style="min-width:110px;flex:1">
+            <label class="form-lbl" style="margin-bottom:3px;display:block">Status</label>
+            <div class="cs-wrap" data-cs="po-status">
+              <div class="cs-display" data-action="cs-open" data-cs="po-status">${pf.status||'All Status'}</div>
+              <div class="cs-dropdown" id="cs-po-status" style="display:none">
+                <div class="cs-option${!pf.status?' selected':''}" data-action="cs-pick" data-cs="po-status" data-field="status" data-val="">All Status</div>
+                <div class="cs-option${pf.status==='needed'?' selected':''}" data-action="cs-pick" data-cs="po-status" data-field="status" data-val="needed">Needed</div>
+                <div class="cs-option${pf.status==='ordered'?' selected':''}" data-action="cs-pick" data-cs="po-status" data-field="status" data-val="ordered">Ordered</div>
+                <div class="cs-option${pf.status==='received'?' selected':''}" data-action="cs-pick" data-cs="po-status" data-field="status" data-val="received">Received</div>
+              </div>
+            </div>
+          </div>
+          ${Object.values(pf).filter(Boolean).length?`<button class="btn btn-ghost btn-sm" style="align-self:flex-end" data-action="po-clear-filters">✕ Clear</button>`:''}
+        </div>
+        <!-- Add row -->
+        <div class="po-add-bar" style="margin-bottom:14px">
+          <div class="form-group" style="flex:2"><label class="form-lbl">Description</label>
+            <input id="po-new-desc" class="form-input" placeholder="Part description..." list="inv-desc-list-po" autocomplete="off" />
+            <datalist id="inv-desc-list-po">${(data.partsInventory||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${esc(p.name)}"></option>`).join('')}</datalist>
+          </div>
+          <div class="form-group" style="flex:1"><label class="form-lbl">Part #</label>
+            <input id="po-new-num" class="form-input" placeholder="Part #" list="inv-num-list-po" autocomplete="off" />
+            <datalist id="inv-num-list-po">${(data.partsInventory||[]).flatMap(p=>(p.partNumbers||[]).filter(n=>n.num).map(n=>({name:p.name,num:n.num}))).sort((a,b)=>a.num.localeCompare(b.num)).map(p=>`<option value="${esc(p.num)}">${esc(p.name)}</option>`).join('')}</datalist>
+          </div>
+          <div class="form-group" style="flex:1"><label class="form-lbl">Vendor</label><input id="po-new-vendor" class="form-input" placeholder="Vendor" /></div>
+          <div class="form-group" style="flex:none;width:70px"><label class="form-lbl">Qty</label><input id="po-new-qty" class="form-input" type="number" placeholder="1" min="1" /></div>
+          <div class="form-group" style="flex:1"><label class="form-lbl">Vehicle</label>
+            <select id="po-new-vehicle" class="form-select">
+              <option value="__stock__">For Stock</option>
+              ${(data.vehicles||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" data-action="add-part-order" style="align-self:flex-end;white-space:nowrap">+ Add</button>
+        </div>
+        <!-- Parts table -->
+        ${filtered.length===0?`<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">${allParts.length===0?'No Parts on Order':'No Results'}</div></div>`:`
+        <div style="overflow-x:auto">
+          <table class="po-table">
+            <thead><tr>
+              <th style="width:28px"></th>
+              <th style="width:32px"><input type="checkbox" id="po-sel-all" data-action="po-sel-all" style="accent-color:var(--amber);cursor:pointer" /></th>
+              <th>Description</th><th>Part #</th><th>Vendor</th><th>Qty</th><th>Unit Cost</th><th>Vehicle</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody>
+              ${filtered.map(p=>{
+                const v=(data.vehicles||[]).find(v=>v.id===p.vehicleId);
+                const dotClass=p.received?'received':p.ordered?'ordered':'needed';
+                return `<tr>
+                  <td><span class="po-status-dot ${dotClass}"></span></td>
+                  <td><input type="checkbox" class="po-cb" data-action="po-toggle-sel" data-id="${esc(p.id)}" ${selectedOrderPartIds.has(p.id)?'checked':''} style="accent-color:var(--amber);cursor:pointer;width:15px;height:15px" /></td>
+                  <td style="font-weight:600">${esc(p.desc||'')}</td>
+                  <td style="font-family:'Share Tech Mono',monospace;color:var(--amber-dim)">${esc(p.num||'')}</td>
+                  <td>${esc(p.vendor||'')}</td>
+                  <td>${esc(p.qty||'1')}</td>
+                  <td>${p.unitCost?'$'+Number(p.unitCost).toFixed(2):''}</td>
+                  <td style="font-size:12px">${esc(v?.name||p.vehicleId==='__stock__'?'For Stock':'')}</td>
+                  <td>
+                    <div style="display:flex;gap:4px;align-items:center">
+                      <input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} />
+                      <span style="font-size:11px">Ord</span>
+                      <input type="checkbox" class="po-cb" data-action="toggle-part-received" data-id="${esc(p.id)}" ${p.received?'checked':''} />
+                      <span style="font-size:11px">Recv</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:4px;flex-wrap:nowrap">
+                      <button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:#2563eb;border-color:rgba(37,99,235,.3)" data-action="po-price-search" data-id="${esc(p.id)}" title="Find best price">💲</button>
+                      <button class="btn btn-ghost btn-sm" style="padding:3px 8px" data-action="edit-part-order" data-id="${esc(p.id)}">Edit</button>
+                      <button class="btn btn-danger btn-sm" style="padding:3px 8px" data-action="del-part-order" data-id="${esc(p.id)}">✕</button>
+                    </div>
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`}`;
+    }
+
+    // ── Render: Admin Tab ───────────────────────────────────────────────────
+    function toggleRow(key, label, hint) {
+      const on = getFeature(key);
+      return `<div class="admin-toggle-row">
+        <div class="admin-toggle-label">
+          <div class="admin-toggle-name">${label}</div>
+          <div class="admin-toggle-hint">${hint}</div>
+        </div>
+        <div class="toggle-switch ${on?'on':''}" data-action="toggle-feature" data-key="${key}">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>`;
+    }
+
+    function renderAdmin() {
+      return `
+        <div class="overview-title" style="margin-bottom:16px">⚙ Admin</div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="admin-section">
+            <div class="admin-section-hdr"><div><div class="admin-section-title">Features</div></div></div>
+            <div class="admin-section-body">
+              ${toggleRow('invoicing', 'Invoicing', 'Show the Invoices tab for creating customer invoices.')}
+              ${toggleRow('partsInventory', 'Parts Inventory', 'Show the Parts tab for tracking on-hand stock.')}
+              ${toggleRow('orderParts', 'Order Parts', 'Show the Order Parts tab for tracking parts to order.')}
+              ${toggleRow('partsNotify', 'Zero Stock Notifications', 'Push a browser notification when a part hits zero quantity.')}
+            </div>
+          </div>
+          <div class="admin-section">
+            <div class="admin-section-hdr"><div><div class="admin-section-title">Business Settings</div></div></div>
+            <div class="admin-section-body">
+              <div class="form-group"><label class="form-lbl">Business Name (appears on invoices)</label><input id="f-biz-name-admin" class="form-input" value="${esc(data.settings?.businessName||'')}" placeholder="e.g. Mattson Bros Farms" /></div>
+              <div style="display:flex;justify-content:flex-end"><button class="btn btn-primary" data-action="save-settings-admin">Save</button></div>
+            </div>
+          </div>
+          <div class="admin-section">
+            <div class="admin-section-hdr"><div><div class="admin-section-title">PIN Lock</div><div class="admin-section-desc">Require a PIN to open the app. Works fully offline.</div></div></div>
+            <div class="admin-section-body">
+              ${getPin()
+                ? `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                    <div style="font-size:14px;color:var(--text-dim)">PIN is set. App requires a PIN on each new session.</div>
+                    <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" data-action="admin-change-pin">Change PIN</button><button class="btn btn-danger btn-sm" data-action="admin-remove-pin">Remove PIN</button></div>
+                  </div>`
+                : `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                    <div style="font-size:14px;color:var(--text-dim)">No PIN set — app is open to anyone with the URL.</div>
+                    <button class="btn btn-primary btn-sm" data-action="admin-set-pin">Set PIN</button>
+                  </div>`}
+            </div>
+          </div>
+          <div class="admin-section">
+            <div class="admin-section-hdr"><div><div class="admin-section-title">QuickBooks Integration</div><div class="admin-section-desc">Export invoices to QuickBooks Desktop (IIF) or QuickBooks Online.</div></div></div>
+            <div class="admin-section-body">
+              <div class="admin-toggle-row">
+                <div class="admin-toggle-label"><div class="admin-toggle-name">QuickBooks Version</div><div class="admin-toggle-hint">Choose which version of QuickBooks you use.</div></div>
+                <div style="display:flex;gap:8px">
+                  <button class="btn ${(data.settings?.qb?.mode||'')==='desktop'?'btn-primary':'btn-ghost'} btn-sm" data-action="qb-set-mode" data-mode="desktop">Desktop</button>
+                  <button class="btn ${(data.settings?.qb?.mode||'')==='online'?'btn-primary':'btn-ghost'} btn-sm" data-action="qb-set-mode" data-mode="online">Online</button>
+                  ${data.settings?.qb?.mode?'':'<span style="font-size:12px;color:var(--text-dim);align-self:center">Not configured</span>'}
+                </div>
+              </div>
+              ${data.settings?.qb?.mode ? `
+              <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+                <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px">Chart of Accounts Mapping</div>
+                <div class="form-row">
+                  <div class="form-group"><label class="form-lbl">Service / Labor Account</label><input id="qb-svc-acct" class="form-input" value="${esc(data.settings?.qb?.serviceAccount||'Service')}" placeholder="e.g. Service Revenue" /></div>
+                  <div class="form-group"><label class="form-lbl">Parts Account</label><input id="qb-parts-acct" class="form-input" value="${esc(data.settings?.qb?.partsAccount||'Parts')}" placeholder="e.g. Parts Sales" /></div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group"><label class="form-lbl">Labor Account</label><input id="qb-labor-acct" class="form-input" value="${esc(data.settings?.qb?.laborAccount||'Labor')}" placeholder="e.g. Labor Income" /></div>
+                  <div class="form-group"><label class="form-lbl">Tax Account (optional)</label><input id="qb-tax-acct" class="form-input" value="${esc(data.settings?.qb?.taxAccount||'')}" placeholder="e.g. Sales Tax" /></div>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-top:4px"><button class="btn btn-primary btn-sm" data-action="qb-save-settings">Save Account Settings</button></div>
+              </div>
+              ${data.settings?.qb?.mode==='desktop' ? `
+              <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+                <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Export invoices as IIF. In QB Desktop: <strong>File → Utilities → Import → IIF Files</strong></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn btn-primary btn-sm" data-action="qb-export-all-iif">Export All Invoices (IIF)</button>
+                  <button class="btn btn-ghost btn-sm" data-action="qb-export-customers-iif">Export Customer List (IIF)</button>
+                </div>
+              </div>` : `
+              <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+                <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">Export invoices as CSV for QBO import. In QBO: <strong>Settings → Import Data → Invoices</strong></div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button class="btn btn-primary btn-sm" data-action="qb-export-all-csv">Export All Invoices (CSV)</button>
+                  <button class="btn btn-ghost btn-sm" data-action="qb-export-customers-csv">Export Customer List (CSV)</button>
+                </div>
+              </div>`}` : ''}
+            </div>
+          </div>
+        </div>`;
+    }
+
+    // ── Main render() ───────────────────────────────────────────────────────
+    function render() {
+      if (!isUnlocked()) {
+        document.getElementById('app').innerHTML = renderPinScreen('enter');
+        return;
+      }
+      document.getElementById('app').innerHTML = `
+        ${modalState ? renderModal() : ''}
+        <div id="topbar" class="topbar no-print">
+          <div class="topbar-brand">SERVICE<span>LOG</span></div>
+          <div class="topbar-stats">
+            <div class="ts"><div class="ts-val">${(data.vehicles||[]).length}</div><div class="ts-lbl">Equipment</div></div>
+            <div class="ts"><div class="ts-val">${(data.records||[]).length}</div><div class="ts-lbl">Records</div></div>
+            <div class="ts"><div class="ts-val" id="sync-dot" style="font-size:20px;line-height:1">⬤</div><div class="ts-lbl" id="sync-lbl">Synced</div></div>
+          </div>
+          <div class="tab-bar" style="overflow-x:auto">
+            <button class="tab-btn${appView==='fleet'?' active':''}" data-action="tab-fleet">Fleet</button>
+            <button class="tab-btn${appView==='report'?' active':''}" data-action="tab-report">Report</button>
+            <button class="tab-btn${appView==='costs'?' active':''}" data-action="tab-costs">Cost Analysis</button>
+            ${getFeature('invoicing')?`<button class="tab-btn${appView==='invoices'?' active':''}" data-action="tab-invoices">Invoices</button>`:''}
+            ${getFeature('orderParts')?`<button class="tab-btn${appView==='order'?' active':''}" data-action="tab-order">Order Parts</button>`:''}
+            ${getFeature('partsInventory')?`<button class="tab-btn${appView==='parts'?' active':''}" data-action="tab-parts">Parts</button>`:''}
+            <button class="tab-btn${appView==='vendors'?' active':''}" data-action="tab-vendors">Vendors</button>
+            <button class="tab-btn${appView==='orderhistory'?' active':''}" data-action="tab-orderhistory">Order History</button>
+            <button class="tab-btn${appView==='search'?' active':''}" data-action="tab-search">🔍 Search</button>
+            <button class="tab-btn${appView==='admin'?' active':''}" data-action="tab-admin">⚙ Admin</button>
+          </div>
+        </div>
+        ${appView==='fleet'
+          ? renderFleet()
+          : appView==='report'
+          ? `<div class="main"><div class="main-content">${renderReport()}</div></div>`
+          : appView==='costs'
+          ? `<div class="main"><div class="main-content">${renderCostAnalysis()}</div></div>`
+          : appView==='invoices'
+          ? `<div class="main"><div class="main-content">${renderInvoices()}</div></div>`
+          : appView==='order'
+          ? `<div class="main"><div class="main-content">${renderPartsToOrder()}</div></div>`
+          : appView==='parts'
+          ? `<div class="main"><div class="main-content">${renderPartsInventory()}</div></div>`
+          : appView==='vendors'
+          ? `<div class="main"><div class="main-content">${renderVendors()}</div></div>`
+          : appView==='orderhistory'
+          ? `<div class="main"><div class="main-content">${renderOrderHistory()}</div></div>`
+          : appView==='search'
+          ? `<div class="main"><div class="main-content">${renderGlobalSearch()}</div></div>`
+          : appView==='admin'
+          ? `<div class="main"><div class="main-content">${renderAdmin()}</div></div>`
+          : ''}`;
+      // Wire up global parts picker
+      setupPartPicker();
+    }
+
+    function renderModal() {
+      if (!modalState) return '';
+      let modal = '';
+      if      (modalState.type==='vehicle')       modal = vehicleModalHTML(modalState.target);
+      else if (modalState.type==='record')         modal = recordModalHTML(modalState.target);
+      else if (modalState.type==='customer')       modal = customerModalHTML(modalState.target);
+      else if (modalState.type==='vendor')         modal = vendorModalHTML(modalState.target);
+      else if (modalState.type==='receive-part')   modal = receivePartModalHTML(modalState.target);
+      else if (modalState.type==='add-parts-to-svc') modal = addPartsToServiceModalHTML(modalState.parts);
+      else if (modalState.type==='inv-item')       modal = invItemModalHTML(modalState.target);
+      else if (modalState.type==='part-num')       modal = partNumModalHTML(modalState.itemId, modalState.target);
+      else if (modalState.type==='todo-edit')      modal = todoModalHTML(modalState.vehicle, modalState.todo);
+      else if (modalState.type==='inv-dupes')      modal = `<div class="modal-overlay" id="modal-bg"><div class="modal"><div class="modal-hdr"><div class="modal-title">Duplicates</div><button class="modal-close" data-action="close-modal">✕</button></div><div class="modal-body"><p>Duplicate detection is now handled within each item's part numbers.</p></div><div class="modal-footer"><button class="btn btn-primary" data-action="close-modal">OK</button></div></div></div>`;
+      else if (modalState.type==='pin-set')        modal = renderPinScreen('set');
+      return modal;
+    }
+
+    function setupPartPicker() {
+      // Global parts picker events
+    }
+
+    // ── Event Dispatch ──────────────────────────────────────────────────────
+    document.getElementById('app').addEventListener('click', function(e) {
+      const el = e.target.closest('[data-action]');
+      if (!el) return;
+      const action = el.dataset.action;
+      const id     = el.dataset.id || '';
+
+      if (action==='pin-digit') {
+        const digit=el.dataset.digit;
+        if(pinEntry.length>=6)return;
+        pinEntry+=digit;
+        const pin=getPin();
+        const mode=window._pinMode||'enter';
+        if(mode==='enter'){
+          if(pinEntry.length>=(pin.length||4)){
+            if(pinEntry===pin){pinError='';unlock();pinEntry='';window._pinMode=null;render();}
+            else{pinError='Incorrect PIN';pinEntry='';document.getElementById('app').innerHTML=renderPinScreen('enter');}
+          } else { document.getElementById('app').innerHTML=renderPinScreen('enter'); }
+        } else if(mode==='set'){
+          if(pinEntry.length>=4){window._pinConfirm=pinEntry;pinEntry='';window._pinMode='confirm';document.getElementById('app').innerHTML=renderPinScreen('confirm');}
+          else{document.getElementById('app').innerHTML=renderPinScreen('set');}
+        } else if(mode==='confirm'){
+          if(pinEntry.length>=window._pinConfirm.length){
+            if(pinEntry===window._pinConfirm){localStorage.setItem(PIN_KEY,pinEntry);pinError='';pinEntry='';window._pinMode=null;window._pinConfirm=null;unlock();render();}
+            else{pinError='PINs did not match — try again';pinEntry='';window._pinMode='set';window._pinConfirm=null;document.getElementById('app').innerHTML=renderPinScreen('set');}
+          } else{document.getElementById('app').innerHTML=renderPinScreen('confirm');}
+        }
+      } else if(action==='pin-del'){
+        pinEntry=pinEntry.slice(0,-1);pinError='';
+        document.getElementById('app').innerHTML=renderPinScreen(window._pinMode||'enter');
+      } else if(action==='admin-set-pin'){pinEntry='';pinError='';window._pinMode='set';document.getElementById('app').innerHTML=renderPinScreen('set');
+      } else if(action==='admin-change-pin'){pinEntry='';pinError='';window._pinMode='set';document.getElementById('app').innerHTML=renderPinScreen('set');
+      } else if(action==='admin-remove-pin'){if(!confirm('Remove PIN?'))return;localStorage.removeItem(PIN_KEY);render();
+
+      } else if(action==='tab-fleet'){appView='fleet';render();
+      } else if(action==='tab-report'){appView='report';render();
+      } else if(action==='tab-costs'){appView='costs';render();
+      } else if(action==='tab-invoices'){appView='invoices';render();
+      } else if(action==='tab-order'){appView='order';render();
+      } else if(action==='tab-parts'){appView='parts';render();
+      } else if(action==='tab-vendors'){appView='vendors';render();
+      } else if(action==='tab-orderhistory'){appView='orderhistory';render();
+      } else if(action==='tab-search'){appView='search';render();
+      } else if(action==='tab-admin'){appView='admin';render();
+
+      } else if(action==='select-vehicle'){
+        const v=data.vehicles.find(v=>v.id===id);
+        if(v){selectedId=v.id;selectedCustomerId=v.customerId;appView='fleet';render();}
+      } else if(action==='select'){
+        const v=data.vehicles.find(v=>v.id===id);
+        if(v){selectedId=v.id;selectedCustomerId=v.customerId;appView='fleet';render();}
+      } else if(action==='gs-nav'){
+        selectedId=id;selectedCustomerId=el.dataset.custId||'';appView='fleet';render();
+
+      } else if(action==='close-modal'){modalState=null;render();
+
+      } else if(action==='add-vehicle'){modalState={type:'vehicle',target:null};render();
+      } else if(action==='edit-vehicle'){
+        const v=data.vehicles.find(v=>v.id===id)||null;
+        modalState={type:'vehicle',target:v};render();
+      } else if(action==='del-vehicle'){
+        if(!confirm('Delete this vehicle and all its service records?'))return;
+        const vehicles=data.vehicles.filter(v=>v.id!==id);
+        const records=data.records.filter(r=>r.vehicleId!==id);
+        selectedId='';render();update({...data,vehicles,records});
+      } else if(action==='save-vehicle'){
+        const name=document.getElementById('f-veh-name')?.value?.trim()||'';
+        if(!name){alert('Name required.');return;}
+        const vObj={
+          name,type:document.getElementById('f-veh-type')?.value||'Other',
+          customerId:document.getElementById('f-veh-cust')?.value||'',
+          year:document.getElementById('f-veh-year')?.value?.trim()||'',
+          make:document.getElementById('f-veh-make')?.value?.trim()||'',
+          model:document.getElementById('f-veh-model')?.value?.trim()||'',
+          vin:document.getElementById('f-veh-vin')?.value?.trim()||'',
+          engine:document.getElementById('f-veh-engine')?.value?.trim()||'',
+          hp:document.getElementById('f-veh-hp')?.value?.trim()||'',
+          hours:document.getElementById('f-veh-hours')?.value?.trim()||'',
+          notes:document.getElementById('f-veh-notes')?.value?.trim()||'',
+        };
+        if(modalState.target){
+          update({...data,vehicles:data.vehicles.map(v=>v.id===modalState.target.id?{...modalState.target,...vObj}:v)});
+        } else {
+          const nv={id:uid(),...vObj,todos:[]};
+          update({...data,vehicles:[...data.vehicles,nv]});
+          selectedId=nv.id;selectedCustomerId=vObj.customerId;appView='fleet';
+        }
+        modalState=null;render();
+
+      } else if(action==='add-record'){modalState={type:'record',target:null};render();
+      } else if(action==='edit-record'){
+        const r=data.records.find(r=>r.id===id)||null;
+        if(r)modalState={type:'record',target:r,editOldParts:getPartsArray(r)};render();
+      } else if(action==='del-record'){
+        if(!confirm('Delete this service record?'))return;
+        const r=data.records.find(r=>r.id===id);
+        if(r&&confirm('Return parts to inventory?')){
+          let inv=data.partsInventory||[];
+          getPartsArray(r).forEach(p=>{if(p.invPartId){const qty=parseInt(p.qtyUsed)||1;inv=inv.map(ip=>ip.id===p.invPartId?{...ip,qty:String((parseInt(ip.qty)||0)+qty)}:ip);}});
+          update({...data,records:data.records.filter(r=>r.id!==id),partsInventory:inv});
+        } else {
+          update({...data,records:data.records.filter(r=>r.id!==id)});
+        }
+        modalState=null;render();
+      } else if(action==='save-record'){
+        const date=document.getElementById('f-date')?.value||'';
+        const type=document.getElementById('f-type')?.value?.trim()||'';
+        if(!date||!type){alert('Date and service type required.');return;}
+        const cost=document.getElementById('f-cost')?.value?.trim()||'';
+        const hours=document.getElementById('f-hours')?.value?.trim()||'';
+        const tech=document.getElementById('f-tech')?.value?.trim()||'';
+        const notes=document.getElementById('f-notes')?.value?.trim()||'';
+        // Collect parts
+        const partEntries=[...document.querySelectorAll('.part-entry')];
+        const parts=partEntries.map(pe=>({
+          desc:pe.querySelector('.part-desc-input')?.value?.trim()||'',
+          num:pe.querySelector('.part-num-input')?.value?.trim()||'',
+          qtyUsed:pe.querySelector('.part-qty-input')?.value?.trim()||'1',
+          cost:pe.querySelector('.part-cost-input')?.value?.trim()||'',
+          invPartId:pe.dataset.invId||'',
+          pnId:pe.dataset.pnId||'',
+        })).filter(p=>p.desc||p.num);
+
+        let partsInventory=data.partsInventory||[];
+        // If editing, restore old part qtys
+        if(modalState.target&&modalState.editOldParts){
+          modalState.editOldParts.forEach(p=>{if(p.invPartId){const qty=parseInt(p.qtyUsed)||1;partsInventory=partsInventory.map(ip=>ip.id===p.invPartId?{...ip,qty:String((parseInt(ip.qty)||0)+qty)}:ip);}});
+        }
+        // Deduct new qtys
+        parts.forEach(p=>{if(p.invPartId){const qty=parseInt(p.qtyUsed)||1;partsInventory=partsInventory.map(ip=>ip.id===p.invPartId?{...ip,qty:String(Math.max(0,(parseInt(ip.qty)||0)-qty))}:ip);}});
+
+        const rec={date,type,cost,hours,tech,notes,parts,partnum:parts.map(p=>p.num).filter(Boolean).join(', ')};
+        let records;
+        if(modalState.target){
+          records=data.records.map(r=>r.id===modalState.target.id?{...modalState.target,...rec}:r);
+        } else {
+          const vid=selectedId;
+          const v=data.vehicles.find(v=>v.id===vid);
+          records=[...data.records,{id:uid(),vehicleId:vid,...rec}];
+          // Update vehicle hours if higher
+          const newHours=Number(hours);
+          if(v&&newHours>Number(v.hours||0)){
+            const vehicles=data.vehicles.map(vv=>vv.id===vid?{...vv,hours:String(newHours)}:vv);
+            modalState=null;update({...data,vehicles,records,partsInventory});return;
+          }
+        }
+        modalState=null;update({...data,records,partsInventory});
+
+      } else if(action==='toggle-record'){
+        if(selectedRecordIds.has(id)) selectedRecordIds.delete(id);
+        else selectedRecordIds.add(id);
+        render();
+      } else if(action==='create-invoice'){
+        if(selectedRecordIds.size===0){alert('Select at least one service record first.');return;}
+        const recs=[...selectedRecordIds].map(rid=>data.records.find(r=>r.id===rid)).filter(Boolean);
+        const v=data.vehicles.find(v=>v.id===selectedId);
+        const cust=data.customers.find(c=>c.id===v?.customerId);
+        const invNum='INV-'+String((data.invoices||[]).length+1).padStart(4,'0');
+        const lineItems=recs.map(r=>({id:r.id,vehicleId:r.vehicleId,vehicleName:v?.name||'',type:r.type,notes:r.notes,cost:r.cost||'0',date:r.date}));
+        const total=lineItems.reduce((s,l)=>s+(parseFloat(l.cost)||0),0);
+        const inv={id:uid(),num:invNum,customerId:cust?.id||'',date:new Date().toISOString().slice(0,10),status:'draft',businessName:data.settings?.businessName||'',lineItems,laborLines:[],notes:'',total:String(total),qbExported:false,qbExportedDate:''};
+        selectedRecordIds.clear();
+        update({...data,invoices:[...(data.invoices||[]),inv]});
+        appView='invoices';render();
+
+      } else if(action==='add-part'){
+        const list=document.getElementById('parts-list');
+        if(!list)return;
+        const idx=list.querySelectorAll('.part-entry').length;
+        const div=document.createElement('div');
+        div.className='part-entry';
+        div.innerHTML='<div class="part-inv-wrap"><input class="part-desc-input" placeholder="Search or type new part..." autocomplete="off" /></div>'
+          +'<div class="part-inv-wrap"><input class="part-num-input" placeholder="Part #" autocomplete="off" /></div>'
+          +'<input class="part-qty-input form-input" type="number" placeholder="1" value="1" min="0" style="width:60px" />'
+          +'<input class="part-cost-input form-input" type="number" placeholder="Cost $" step="0.01" min="0" style="width:90px" />'
+          +'<button class="part-remove-btn" data-action="remove-part" data-idx="'+idx+'">✕</button>';
+        list.appendChild(div);
+      } else if(action==='remove-part'){
+        const entry=el.closest('.part-entry');
+        if(entry)entry.remove();
+
+      } else if(action==='add-customer'){modalState={type:'customer',target:null};render();
+      } else if(action==='edit-customer'){
+        const c=(data.customers||[]).find(c=>c.id===id)||null;
+        modalState={type:'customer',target:c};render();
+      } else if(action==='del-customer'){
+        if(!confirm('Delete this customer? Their vehicles will be unassigned.'))return;
+        const vehicles=data.vehicles.map(v=>v.customerId===id?{...v,customerId:''}:v);
+        update({...data,customers:(data.customers||[]).filter(c=>c.id!==id),vehicles});
+        selectedCustomerId='';render();
+      } else if(action==='save-customer'){
+        const cname=document.getElementById('f-cust-name')?.value?.trim()||'';
+        if(!cname){alert('Customer name required.');return;}
+        const cnotes   =document.getElementById('f-cust-notes')?.value||'';
+        const cbiz     =document.getElementById('f-cust-biz')?.value?.trim()||'';
+        const ccontact =document.getElementById('f-cust-contact')?.value?.trim()||'';
+        const cphone   =document.getElementById('f-cust-phone')?.value?.trim()||'';
+        const cemail   =document.getElementById('f-cust-email')?.value?.trim()||'';
+        const caddr    =document.getElementById('f-cust-addr')?.value?.trim()||'';
+        const custData={name:cname,notes:cnotes,businessName:cbiz,contact:ccontact,phone:cphone,email:cemail,address:caddr};
+        if(modalState.target){
+          update({...data,customers:(data.customers||[]).map(c=>c.id===modalState.target.id?{...modalState.target,...custData}:c)});
+        } else {
+          update({...data,customers:[...(data.customers||[]),{id:uid(),...custData}]});
+        }
+        modalState=null;render();
+
+      } else if(action==='view-invoice'){
+        const inv=(data.invoices||[]).find(i=>i.id===id);
+        if(!inv)return;
+        const cust=(data.customers||[]).find(c=>c.id===inv.customerId);
+        const biz=data.settings?.businessName||'';
+        const w=window.open('','_blank');
+        w.document.write(`<!DOCTYPE html><html><head><title>Invoice ${inv.num}</title><style>body{font-family:Arial,sans-serif;padding:30px;max-width:800px;margin:0 auto}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:left}th{background:#f9fafb;font-size:12px}@media print{.no-print{display:none}}</style></head><body>
+          <div style="display:flex;justify-content:space-between;margin-bottom:24px">
+            <div><h2 style="margin:0">${esc(biz||'Invoice')}</h2></div>
+            <div style="text-align:right"><h3 style="margin:0">${esc(inv.num)}</h3><div>${esc(inv.date)}</div><div style="margin-top:4px;padding:3px 8px;background:${inv.status==='paid'?'#dcfce7':inv.status==='sent'?'#dbeafe':'#f3f4f6'};border-radius:4px;font-size:12px;display:inline-block">${esc(inv.status||'Draft')}</div></div>
+          </div>
+          ${cust?`<div style="margin-bottom:20px"><strong>Bill To:</strong><br>${esc(cust.name)}</div>`:''}
+          <table><thead><tr><th>Date</th><th>Vehicle</th><th>Service</th><th>Notes</th><th style="text-align:right">Amount</th></tr></thead>
+          <tbody>${(inv.lineItems||[]).map(l=>`<tr><td>${esc(l.date||'')}</td><td>${esc(l.vehicleName||'')}</td><td>${esc(l.type||'')}</td><td>${esc((l.notes||'').slice(0,60))}</td><td style="text-align:right">${l.cost?'$'+Number(l.cost).toLocaleString():''}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total</td><td style="text-align:right;font-weight:700">$${Number(inv.total||0).toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr></tfoot>
+          </table>
+          <div class="no-print" style="margin-top:20px"><button onclick="window.print()">Print</button></div>
+        </body></html>`);
+        w.document.close();
+      } else if(action==='cycle-status'){
+        const inv=(data.invoices||[]).find(i=>i.id===id);
+        if(!inv)return;
+        const next={draft:'sent',sent:'paid',paid:'paid'}[inv.status||'draft'];
+        update({...data,invoices:(data.invoices||[]).map(i=>i.id===id?{...i,status:next}:i)});
+      } else if(action==='del-invoice'){
+        if(!confirm('Delete this invoice?'))return;
+        update({...data,invoices:(data.invoices||[]).filter(i=>i.id!==id)});
+      } else if(action==='toggle-invoice-sel'){
+        if(selectedInvoiceIds.has(id))selectedInvoiceIds.delete(id);else selectedInvoiceIds.add(id);render();
+      } else if(action==='inv-clear-selection'){selectedInvoiceIds.clear();render();
+      } else if(action==='inv-select-all'){(data.invoices||[]).forEach(i=>selectedInvoiceIds.add(i.id));render();
+      } else if(action==='inv-export-qb'){
+        const selected=[...selectedInvoiceIds].map(id=>(data.invoices||[]).find(i=>i.id===id)).filter(Boolean);
+        if(!selected.length)return;
+        const alreadyExported=selected.filter(i=>i.qbExported);
+        if(alreadyExported.length>0){if(!confirm(alreadyExported.length+' invoice(s) already exported. Export again anyway?'))return;}
+        const qbMode=data.settings?.qb?.mode||'';
+        if(qbMode==='desktop')exportInvoicesIIF(selected);else exportInvoicesCSV(selected);
+        const today=new Date().toISOString().slice(0,10);
+        const invIds=new Set(selected.map(i=>i.id));
+        const updated=(data.invoices||[]).map(i=>invIds.has(i.id)?{...i,qbExported:true,qbExportedDate:today}:i);
+        selectedInvoiceIds.clear();update({...data,invoices:updated});
+      } else if(action==='inv-unexport'){
+        if(!confirm('Remove QB export mark?'))return;
+        update({...data,invoices:(data.invoices||[]).map(i=>i.id===id?{...i,qbExported:false,qbExportedDate:''}:i)});
+
+      } else if(action==='add-vendor'){modalState={type:'vendor',target:null};render();
+      } else if(action==='edit-vendor'){
+        const v=(data.vendors||[]).find(v=>v.id===id)||null;
+        modalState={type:'vendor',target:v};render();
+      } else if(action==='del-vendor'){
+        if(!confirm('Delete this vendor?'))return;
+        update({...data,vendors:(data.vendors||[]).filter(v=>v.id!==id)});
+      } else if(action==='save-vendor'){
+        const name=document.getElementById('f-vnd-name')?.value?.trim()||'';
+        if(!name){alert('Vendor name required.');return;}
+        const vObj={name,phone:document.getElementById('f-vnd-phone')?.value?.trim()||'',catalogUrl:document.getElementById('f-vnd-url')?.value?.trim()||'',address:document.getElementById('f-vnd-addr')?.value?.trim()||'',notes:document.getElementById('f-vnd-notes')?.value?.trim()||''};
+        if(modalState.target){update({...data,vendors:(data.vendors||[]).map(v=>v.id===modalState.target.id?{...modalState.target,...vObj}:v)});}
+        else{update({...data,vendors:[...(data.vendors||[]),{id:uid(),...vObj}]});}
+        modalState=null;render();
+
+      } else if(action==='add-part-order'){
+        const desc=document.getElementById('po-new-desc')?.value?.trim()||'';
+        const num=document.getElementById('po-new-num')?.value?.trim()||'';
+        const vendor=document.getElementById('po-new-vendor')?.value?.trim()||'';
+        const qty=document.getElementById('po-new-qty')?.value?.trim()||'1';
+        const vehicleId=document.getElementById('po-new-vehicle')?.value||'__stock__';
+        if(!desc&&!num){alert('Enter a description or part number.');return;}
+        applyDuplicateCheck(num,vendor,desc,qty,vehicleId,'',function(){
+          const newP={id:uid(),desc,num,vendor,qty,vehicleId,ordered:false,received:false,unitCost:'',invPartId:''};
+          update({...data,partsToOrder:[...(data.partsToOrder||[]),newP]});
+        });
+      } else if(action==='edit-part-order'){
+        const p=(data.partsToOrder||[]).find(p=>p.id===id)||null;
+        if(p){
+          const desc=prompt('Description:',p.desc)||p.desc;
+          const num=prompt('Part #:',p.num||'')||p.num||'';
+          const vendor=prompt('Vendor:',p.vendor||'')||p.vendor||'';
+          const qty=prompt('Qty:',p.qty||'1')||p.qty||'1';
+          const cost=prompt('Unit Cost:',p.unitCost||'')||p.unitCost||'';
+          update({...data,partsToOrder:(data.partsToOrder||[]).map(pp=>pp.id===id?{...pp,desc,num,vendor,qty,unitCost:cost}:pp)});
+        }
+      } else if(action==='del-part-order'){
+        if(!confirm('Remove this order item?'))return;
+        update({...data,partsToOrder:(data.partsToOrder||[]).filter(p=>p.id!==id)});
+      } else if(action==='toggle-part-ordered'){
+        const p=(data.partsToOrder||[]).find(p=>p.id===id);
+        if(p)update({...data,partsToOrder:(data.partsToOrder||[]).map(pp=>pp.id===id?{...pp,ordered:!pp.ordered}:pp)});
+      } else if(action==='toggle-part-received'){
+        const orderItem=(data.partsToOrder||[]).find(p=>p.id===id);
+        if(!orderItem)return;
+        if(!orderItem.received){
+          modalState={type:'receive-part',target:orderItem};render();
+        } else {
+          if(!confirm('Un-receive this item?'))return;
+          update({...data,partsToOrder:(data.partsToOrder||[]).map(p=>p.id===id?{...p,received:false}:p)});
+        }
+      } else if(action==='save-receive'){
+        const orderItem=modalState.target;
+        const unitCost=document.getElementById('f-recv-cost')?.value?.trim()||'';
+        const location=document.getElementById('f-recv-location')?.value?.trim()||'';
+        const qtyReceived=parseInt(document.getElementById('f-recv-qty')?.value)||1;
+        const parts=(data.partsToOrder||[]).map(p=>p.id===orderItem.id?{...p,received:true,ordered:true,unitCost,receivedLocation:location}:p);
+        let partsInventory=data.partsInventory||[];
+        if(orderItem.invPartId){
+          partsInventory=partsInventory.map(p=>p.id===orderItem.invPartId?{...p,qty:String((parseInt(p.qty)||0)+qtyReceived),location:location||p.location}:p);
+        } else {
+          if(confirm('Add "'+( orderItem.desc||orderItem.num||'this part')+'" to Parts Inventory?')){
+            partsInventory=[...partsInventory,{id:uid(),name:orderItem.desc||'',qty:String(qtyReceived),minQty:'',location,notes:'',partNumbers:orderItem.num?[{id:uid(),num:orderItem.num,vendor:orderItem.vendor||'',unitCost,notes:''}]:[]}];
+          }
+        }
+        modalState=null;update({...data,partsToOrder:parts,partsInventory});
+
+      } else if(action==='move-received'){
+        const received=(data.partsToOrder||[]).filter(p=>p.received);
+        if(!received.length){alert('No received items to archive.');return;}
+        if(!confirm('Archive '+received.length+' received item(s) to Order History?'))return;
+        const today=new Date().toISOString().slice(0,10);
+        const hist=[...(data.orderHistory||[]),...received.map(p=>({...p,receivedDate:p.receivedDate||today}))];
+        update({...data,partsToOrder:(data.partsToOrder||[]).filter(p=>!p.received),orderHistory:hist});
+      } else if(action==='consolidate-dupes'){
+        const parts=data.partsToOrder||[];
+        const seen={};const dupes=[];
+        parts.forEach(p=>{const k=(p.num||'').toLowerCase().trim();if(!k)return;if(seen[k]){dupes.push(p.id);}else{seen[k]=true;}});
+        if(!dupes.length){alert('No duplicate part numbers found.');return;}
+        if(!confirm('Remove '+dupes.length+' duplicate(s)?'))return;
+        update({...data,partsToOrder:parts.filter(p=>!dupes.includes(p.id))});
+
+      } else if(action==='inv-qty-inc'){
+        const inv=(data.partsInventory||[]).map(p=>p.id===id?{...p,qty:String(Math.max(0,(parseInt(p.qty)||0)+1))}:p);
+        update({...data,partsInventory:inv});
+      } else if(action==='inv-qty-dec'){
+        const inv=(data.partsInventory||[]).map(p=>p.id===id?{...p,qty:String(Math.max(0,(parseInt(p.qty)||0)-1))}:p);
+        update({...data,partsInventory:inv});
+      } else if(action==='add-inv-item'){modalState={type:'inv-item',target:null};render();
+      } else if(action==='save-inv-item'){
+        const name=document.getElementById('f-item-name')?.value?.trim()||'';
+        if(!name){alert('Item name required.');return;}
+        const form={name,qty:document.getElementById('f-item-qty')?.value?.trim()||'',minQty:document.getElementById('f-item-minqty')?.value?.trim()||'',location:document.getElementById('f-item-location')?.value?.trim()||'',notes:document.getElementById('f-item-notes')?.value?.trim()||''};
+        if(modalState.target){
+          update({...data,partsInventory:(data.partsInventory||[]).map(p=>p.id===modalState.target.id?{...p,...form}:p)});
+        } else {
+          update({...data,partsInventory:[...(data.partsInventory||[]),{id:uid(),...form,partNumbers:[]}]});
+        }
+        modalState=null;render();
+      } else if(action==='edit-inv-item'){
+        const p=(data.partsInventory||[]).find(p=>p.id===id)||null;
+        if(p){modalState={type:'inv-item',target:p};render();}
+      } else if(action==='del-inv-item'){
+        if(!confirm('Delete this item and all its part numbers?'))return;
+        update({...data,partsInventory:(data.partsInventory||[]).filter(p=>p.id!==id)});
+      } else if(action==='add-part-num'){modalState={type:'part-num',itemId:id,target:null};render();
+      } else if(action==='edit-part-num'){
+        const p=(data.partsInventory||[]).find(p=>p.id===id);
+        const nid=el.dataset.nid;
+        const pn=(p?.partNumbers||[]).find(n=>n.id===nid)||null;
+        if(p&&pn){modalState={type:'part-num',itemId:id,target:pn};render();}
+      } else if(action==='save-part-num'){
+        const vendor=document.getElementById('f-pn-vendor')?.value?.trim()||'';
+        const num=document.getElementById('f-pn-num')?.value?.trim()||'';
+        const cost=document.getElementById('f-pn-cost')?.value?.trim()||'';
+        const notes=document.getElementById('f-pn-notes')?.value?.trim()||'';
+        const itemId=modalState.itemId;
+        if(modalState.target){
+          const inv=(data.partsInventory||[]).map(p=>p.id===itemId?{...p,partNumbers:p.partNumbers.map(n=>n.id===modalState.target.id?{...n,vendor,num,unitCost:cost,notes}:n)}:p);
+          update({...data,partsInventory:inv});
+        } else {
+          const inv=(data.partsInventory||[]).map(p=>p.id===itemId?{...p,partNumbers:[...(p.partNumbers||[]),{id:uid(),vendor,num,unitCost:cost,notes}]}:p);
+          update({...data,partsInventory:inv});
+        }
+        modalState=null;render();
+      } else if(action==='del-part-num'){
+        if(!confirm('Remove this part number?'))return;
+        const nid=el.dataset.nid;
+        const inv=(data.partsInventory||[]).map(p=>p.id===id?{...p,partNumbers:(p.partNumbers||[]).filter(n=>n.id!==nid)}:p);
+        update({...data,partsInventory:inv});
+      } else if(action==='inv-find-dupes'){alert('Duplicate detection is now handled within each item\'s part numbers.');
+      } else if(action==='inv-clear-filters'){window._invFilters={q:'',vendor:'',location:''};render();
+
+      } else if(action==='toggle-todo-section'){
+        window['_todoOpen_'+id]=(window['_todoOpen_'+id]===false)?true:false;render();
+      } else if(action==='todo-add'){
+        const vid=el.dataset.vid;
+        const textEl=document.getElementById('todo-new-'+vid);
+        const priEl=document.getElementById('todo-pri-'+vid);
+        const text=textEl?.value?.trim()||'';
+        if(!text){textEl?.focus();return;}
+        const pri=priEl?.value||'medium';
+        const newTodo={id:uid(),text,priority:pri,done:false,createdAt:new Date().toISOString().slice(0,10),notes:''};
+        const vehicles=data.vehicles.map(v=>v.id===vid?{...v,todos:[...(v.todos||[]),newTodo]}:v);
+        update({...data,vehicles});
+      } else if(action==='todo-toggle'){
+        const vid=el.dataset.vid,tid=el.dataset.tid;
+        const vehicles=data.vehicles.map(v=>v.id===vid?{...v,todos:(v.todos||[]).map(t=>t.id===tid?{...t,done:!t.done}:t)}:v);
+        update({...data,vehicles});
+      } else if(action==='todo-del'){
+        const vid=el.dataset.vid,tid=el.dataset.tid;
+        if(!confirm('Delete this task?'))return;
+        const vehicles=data.vehicles.map(v=>v.id===vid?{...v,todos:(v.todos||[]).filter(t=>t.id!==tid)}:v);
+        update({...data,vehicles});
+      } else if(action==='todo-edit'){
+        const vid=el.dataset.vid,tid=el.dataset.tid;
+        const v=data.vehicles.find(v=>v.id===vid);
+        const todo=(v?.todos||[]).find(t=>t.id===tid)||null;
+        if(v&&todo){modalState={type:'todo-edit',vehicle:v,todo};render();}
+      } else if(action==='save-todo'){
+        const text=document.getElementById('f-todo-text')?.value?.trim()||'';
+        if(!text){alert('Task text required.');return;}
+        const pri=document.getElementById('f-todo-pri')?.value||'medium';
+        const notes=document.getElementById('f-todo-notes')?.value?.trim()||'';
+        const v=modalState.vehicle;
+        const todos=(v.todos||[]).map(t=>t.id===modalState.todo.id?{...t,text,priority:pri,notes}:t);
+        const vehicles=data.vehicles.map(vv=>vv.id===v.id?{...vv,todos}:vv);
+        update({...data,vehicles});modalState=null;render();
+
+      } else if(action==='print-service-history'){
+        const v=data.vehicles.find(v=>v.id===id);
+        if(!v)return;
+        const vRecs=data.records.filter(r=>r.vehicleId===id).sort((a,b)=>b.date.localeCompare(a.date));
+        const cust=(data.customers||[]).find(c=>c.id===v.customerId);
+        const biz=data.settings?.businessName||'';
+        const totalCost=vRecs.reduce((s,r)=>s+(parseFloat(r.cost)||0),0);
+        const w=window.open('','_blank','width=900,height=700');
+        w.document.write(`<!DOCTYPE html><html><head><title>Service History - ${v.name}</title><style>body{font-family:Arial,sans-serif;padding:30px;max-width:860px;margin:0 auto;color:#111}h1{font-size:22px;margin:0}h2{font-size:15px;font-weight:normal;color:#666;margin:4px 0 0}.meta{display:flex;gap:24px;flex-wrap:wrap;margin:16px 0;padding:12px 16px;background:#f8f9fa;border-radius:4px}.meta-item{font-size:12px}.meta-lbl{color:#9ca3af;text-transform:uppercase;letter-spacing:1px;font-size:10px}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:13px}th{text-align:left;padding:8px 10px;border-bottom:2px solid #e5e7eb;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#6b7280}td{padding:8px 10px;border-bottom:1px solid #f3f4f6;vertical-align:top}.cost{font-weight:600;color:#16a34a;text-align:right}.total{font-weight:700;font-size:14px}@media print{body{padding:15px}}</style></head><body>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+            <div><h1>${v.name}</h1><h2>${[v.year,v.make,v.model].filter(Boolean).join(' ')}${v.engine?' · '+v.engine:''}</h2></div>
+            ${biz?`<div style="text-align:right;font-size:13px;color:#374151"><strong>${biz}</strong>${cust?'<br>'+cust.name:''}</div>`:''}
+          </div>
+          <div class="meta">
+            ${v.vin?`<div class="meta-item"><div class="meta-lbl">VIN / Serial</div>${v.vin}</div>`:''}
+            ${v.hours?`<div class="meta-item"><div class="meta-lbl">Hours / Miles</div>${Number(v.hours).toLocaleString()}</div>`:''}
+            <div class="meta-item"><div class="meta-lbl">Total Records</div>${vRecs.length}</div>
+            <div class="meta-item"><div class="meta-lbl">Total Cost</div>$${totalCost.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+            ${vRecs[0]?`<div class="meta-item"><div class="meta-lbl">Last Service</div>${vRecs[0].date}</div>`:''}
+            <div class="meta-item"><div class="meta-lbl">Printed</div>${new Date().toLocaleDateString()}</div>
+          </div>
+          <table><thead><tr><th>Date</th><th>Service Type</th><th>Notes</th><th>Parts</th><th>Tech</th><th style="text-align:right">Cost</th></tr></thead>
+          <tbody>${vRecs.map(r=>{const pa=getPartsArray(r);const partsHtml=pa.map(p=>[p.desc,p.num,p.cost?'$'+Number(p.cost).toLocaleString():''].filter(Boolean).join(' · ')).join('<br>');const notes=getCleanNotes(r);return`<tr><td style="white-space:nowrap">${r.date}</td><td style="white-space:nowrap">${r.type||''}</td><td>${notes||''}</td><td style="font-size:11px;color:#6b7280">${partsHtml}</td><td>${r.tech||''}</td><td class="cost">${r.cost?'$'+Number(r.cost).toLocaleString():''}</td></tr>`;}).join('')}
+          <tr style="border-top:2px solid #e5e7eb"><td colspan="5" class="total" style="text-align:right">Total:</td><td class="cost total">$${totalCost.toLocaleString(undefined,{minimumFractionDigits:2})}</td></tr></tbody></table>
+        </body></html>`);
+        w.document.close();w.focus();setTimeout(function(){w.print();},400);
+
+      } else if(action==='save-settings-admin'){
+        const bname=document.getElementById('f-biz-name-admin')?.value?.trim()||'';
+        update({...data,settings:{...(data.settings||{}),businessName:bname}});
+      } else if(action==='toggle-feature'){
+        const key=el.dataset.key;
+        const features={...(data.settings?.features||{})};
+        features[key]=!features[key];
+        update({...data,settings:{...(data.settings||{}),features}});
+      } else if(action==='qb-set-mode'){
+        const mode=el.dataset.mode;
+        update({...data,settings:{...data.settings,qb:{...(data.settings?.qb||{}),mode}}});
+      } else if(action==='qb-save-settings'){
+        const qb={...(data.settings?.qb||{}),serviceAccount:document.getElementById('qb-svc-acct')?.value?.trim()||'Service',partsAccount:document.getElementById('qb-parts-acct')?.value?.trim()||'Parts',laborAccount:document.getElementById('qb-labor-acct')?.value?.trim()||'Labor',taxAccount:document.getElementById('qb-tax-acct')?.value?.trim()||''};
+        update({...data,settings:{...data.settings,qb}});
+      } else if(action==='qb-export-all-iif'){exportInvoicesIIF(null);
+      } else if(action==='qb-export-customers-iif'){exportCustomersIIF();
+      } else if(action==='qb-export-all-csv'){exportInvoicesCSV(null);
+      } else if(action==='qb-export-customers-csv'){exportCustomersCSV();
+
+      } else if(action==='po-toggle-sel'){
+        if(selectedOrderPartIds.has(id))selectedOrderPartIds.delete(id);else selectedOrderPartIds.add(id);render();
+      } else if(action==='po-clear-sel'){selectedOrderPartIds.clear();render();
+      } else if(action==='po-sel-all'){
+        const allIds=(data.partsToOrder||[]).map(p=>p.id);
+        if(selectedOrderPartIds.size===allIds.length)selectedOrderPartIds.clear();else allIds.forEach(id=>selectedOrderPartIds.add(id));render();
+      } else if(action==='inv-select-all-po'){
+        (data.partsToOrder||[]).forEach(p=>selectedOrderPartIds.add(p.id));render();
+      } else if(action==='po-add-to-service'){
+        const parts=[...selectedOrderPartIds].map(id=>(data.partsToOrder||[]).find(p=>p.id===id)).filter(Boolean);
+        if(!parts.length)return;
+        const defaultVehId=parts.map(p=>p.vehicleId).find(v=>v&&v!=='__stock__')||'';
+        modalState={type:'add-parts-to-svc',parts,defaultVehicleId:defaultVehId};render();
+      } else if(action==='save-parts-to-service'){
+        const vehicleId=document.getElementById('f-ats-vehicle')?.value||'';
+        if(!vehicleId){alert('Please select a vehicle.');return;}
+        const date=document.getElementById('f-ats-date')?.value||new Date().toISOString().slice(0,10);
+        const type=document.getElementById('f-ats-type')?.value?.trim()||'Repair';
+        const notes=document.getElementById('f-ats-notes')?.value?.trim()||'';
+        const hours=document.getElementById('f-ats-hours')?.value?.trim()||'';
+        const tech=document.getElementById('f-ats-tech')?.value?.trim()||'';
+        const parts=modalState.parts||[];
+        const qtyInputs=document.querySelectorAll('.ats-qty-input');
+        const partsArr=parts.map((p,idx)=>{const qtyUsed=qtyInputs[idx]?.value?.trim()||p.qty||'1';return{desc:p.desc||'',num:p.num||'',cost:p.unitCost||'',qtyUsed,invPartId:p.invPartId||''};});
+        const totalCost=partsArr.reduce((s,p)=>s+(parseFloat(p.cost)||0)*(parseInt(p.qtyUsed||1)),0);
+        let vehicles=data.vehicles;
+        if(hours){vehicles=vehicles.map(v=>v.id===vehicleId&&Number(hours)>Number(v.hours||0)?{...v,hours}:v);}
+        let partsInventory=data.partsInventory||[];
+        partsArr.forEach(function(p){if(p.invPartId){const qty=parseInt(p.qtyUsed)||1;partsInventory=partsInventory.map(function(ip){return ip.id===p.invPartId?{...ip,qty:String(Math.max(0,(parseInt(ip.qty)||0)-qty))}:ip;});}});
+        const newRecord={id:uid(),vehicleId,date,type,notes,tech,hours,parts:partsArr,cost:totalCost?String(totalCost):'',partnum:''};
+        selectedOrderPartIds.clear();modalState=null;
+        const v=data.vehicles.find(v=>v.id===vehicleId);
+        if(v){appView='fleet';selectedCustomerId=v.customerId;selectedId=vehicleId;}
+        update({...data,vehicles,partsInventory,records:[...data.records,newRecord]});
+
+      } else if(action==='open-settings'){appView='admin';render();
+      }
+
+      // Custom select dropdowns
+      const invPick=e.target.closest('[data-action="cs-inv-pick"]');
+      if(invPick){
+        if(!window._invFilters)window._invFilters={q:'',vendor:'',location:''};
+        window._invFilters[invPick.dataset.field]=invPick.dataset.val;
+        const dd=invPick.closest('.cs-dropdown');if(dd)dd.style.display='none';
+        _csOpen=null;render();return;
+      }
+      const pick=e.target.closest('[data-action="cs-pick"]');
+      if(pick){
+        poFilters[pick.dataset.field]=pick.dataset.val;
+        const dd=document.getElementById('cs-'+pick.dataset.cs);
+        if(dd)dd.style.display='none';
+        _csOpen=null;render();return;
+      }
+      if(action==='cs-open'){csPosition(el);return;}
+
+      // Parts picker
+      const numOpt=e.target.closest('#gpp .ppi');
+      if(numOpt&&_ppMode){applyPP(numOpt);return;}
+      if(e.target.classList.contains('part-num-input')){showPP(e.target,'num');return;}
+      if(e.target.classList.contains('part-desc-input')){showPP(e.target,'desc');return;}
+
+      // Click outside — close all dropdowns
+      if(_csOpen&&!e.target.closest('.cs-dropdown')&&!e.target.closest('.cs-wrap')){
+        document.querySelectorAll('.cs-dropdown').forEach(d=>d.style.display='none');
+        _csOpen=null;
+      }
+      if(_ppInput&&!e.target.closest('#gpp')&&!e.target.classList.contains('part-desc-input')&&!e.target.classList.contains('part-num-input')){hidePP();}
+    }); // end click handler
+
+    // ── Input events ────────────────────────────────────────────────────────
+    document.getElementById('app').addEventListener('input', function(e) {
+      if(e.target.id==='gs-input'){window._gsq=e.target.value;render();const el=document.getElementById('gs-input');if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}return;}
+      if(e.target.id==='po-q'){poFilters['q']=e.target.value;render();return;}
+      if(e.target.id==='inv-fq'){if(!window._invFilters)window._invFilters={q:'',vendor:'',location:''};window._invFilters.q=e.target.value;render();const el=document.getElementById('inv-fq');if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}return;}
+      if(e.target.classList&&e.target.classList.contains('part-num-input'))showPP(e.target,'num');
+      if(e.target.classList&&e.target.classList.contains('part-desc-input'))showPP(e.target,'desc');
+    },true);
+
+    // ── CS search filter ────────────────────────────────────────────────────
+    document.addEventListener('input', function(e) {
+      const csKey=e.target.dataset.csSearch;if(!csKey)return;
+      const q=e.target.value.toLowerCase().trim();
+      const dd=document.getElementById('cs-'+csKey);if(!dd)return;
+      dd.querySelectorAll('.cs-option').forEach(function(opt){opt.style.display=(!q||opt.dataset.val===''||opt.textContent.toLowerCase().includes(q))?'':'none';});
+    });
+    document.addEventListener('keydown', function(e) {
+      if(e.key==='Escape'&&_csOpen){document.querySelectorAll('.cs-dropdown').forEach(d=>d.style.display='none');_csOpen=null;}
+    });
+
+    // ── Document-level price search ─────────────────────────────────────────
+    document.addEventListener('click', function(e) {
+      const btn=e.target.closest('[data-action="po-price-search"]');
+      if(!btn)return;
+      const pid=btn.dataset.id;
+      const p=(data.partsToOrder||[]).find(p=>p.id===pid);
+      if(!p){const row=btn.closest('tr');if(row){const desc=row.cells?.[2]?.textContent?.trim()||'';const num=row.cells?.[3]?.textContent?.trim()||'';showPricePanel(btn,desc,num);}return;}
+      showPricePanel(btn,p.desc||'',p.num||'');
+    });
+
+    // ── Parts picker mousedown ──────────────────────────────────────────────
+    document.addEventListener('mousedown', function(e) {
+      const pk=document.getElementById('gpp');
+      if(!pk||pk.style.display==='none')return;
+      const opt=e.target.closest('.ppi');
+      if(opt&&pk.contains(opt)){e.preventDefault();applyPP(opt);return;}
+      if(!pk.contains(e.target)&&e.target!==_ppInput)hidePP();
+    },true);
+    document.addEventListener('input', function(e) {
+      if(e.target.classList&&e.target.classList.contains('part-desc-input'))showPP(e.target,'desc');
+      else if(e.target.classList&&e.target.classList.contains('part-num-input'))showPP(e.target,'num');
+    },true);
+    document.addEventListener('click', function(e) {
+      if(e.target.classList&&e.target.classList.contains('part-desc-input')){showPP(e.target,'desc');return;}
+      if(e.target.classList&&e.target.classList.contains('part-num-input')){showPP(e.target,'num');return;}
+    },true);
+
+    // ── CS Position helper ──────────────────────────────────────────────────
+    let _csOpen = null;
+    function csPosition(btn) {
+      const dd=document.getElementById('cs-'+btn.dataset.cs);
+      if(!dd)return;
+      const rect=btn.getBoundingClientRect();
+      dd.style.top=(rect.bottom+2)+'px';
+      dd.style.left=rect.left+'px';
+      dd.style.minWidth=rect.width+'px';
+      dd.style.display='block';
+      _csOpen=btn.dataset.cs;
+      const searchEl=dd.querySelector('.cs-search');
+      if(searchEl){
+        searchEl.value='';
+        dd.querySelectorAll('.cs-option').forEach(o=>o.style.display='');
+        setTimeout(function(){searchEl.focus();},30);
+      }
+    }
+
+    // ── Duplicate check for Order Parts ────────────────────────────────────
+    function applyDuplicateCheck(num, vendor, desc, qty, vehicleId, invPartId, onOk) {
+      if(num){
+        const existing=(data.partsToOrder||[]).find(p=>(p.num||'').toLowerCase()===num.toLowerCase()&&!p.received);
+        if(existing){if(!confirm('Part# '+num+' already in order list. Add anyway?'))return;}
+      }
+      onOk();
+    }
+
+    // ── Notification helpers ────────────────────────────────────────────────
+    function requestNotifPermission() {
+      if('Notification' in window&&Notification.permission==='default')Notification.requestPermission();
+    }
+    function checkZeroStockNotifications(prev, next) {
+      if(!getFeature('partsNotify'))return;
+      if(!('Notification' in window)||Notification.permission!=='granted')return;
+      const prevInv=prev.partsInventory||[];
+      const nextInv=next.partsInventory||[];
+      nextInv.forEach(function(p){
+        if(!p.name&&!p.num)return;
+        const prevPart=prevInv.find(pp=>pp.id===p.id);
+        const wasAboveZero=!prevPart||(parseInt(prevPart.qty)||0)>0;
+        const isNowZero=(parseInt(p.qty)||0)===0&&p.qty!=='';
+        if(wasAboveZero&&isNowZero){
+          try{new Notification('⚠ Out of Stock',{body:(p.name||p.num||'Part')+' is now out of stock.',tag:'zero-stock-'+p.id});}catch(e){}
+        }
+      });
+    }
+
+    // ── Firebase real-time sync ─────────────────────────────────────────────
+    let dbRef = null;
+    try {
+      const app = firebase.initializeApp(FIREBASE_CONFIG);
+      const db  = firebase.database();
+      dbRef = db.ref(DB_PATH);
+
+      // Load from Firebase on connect
+      dbRef.once('value', function(snap) {
+        const remote = snap.val();
+        if (remote && remote.vehicles && remote.vehicles.length > 0) {
+          data = migrateInvoices(migrateCustomers(migratePhotos(remote)));
+          if (!data.partsInventory) data.partsInventory = [];
+          if (data.partsInventory.length > 0 && !data.partsInventory[0].partNumbers) {
+            data.partsInventory = data.partsInventory.map(function(p) {
+              var partNums = [];
+              if (p.num || p.vendor || p.unitCost) {
+                partNums.push({id: p.id+'_pn1', num: p.num||'', vendor: p.vendor||'', unitCost: p.unitCost||'', notes: ''});
+              }
+              return {id: p.id, name: p.name||'', qty: p.qty||'', minQty: p.minQty||'', location: p.location||'', notes: p.notes||'', partNumbers: partNums};
+            });
+          }
+          saveData(data);
+          render();
+        }
+        // Subscribe to real-time updates
+        dbRef.on('value', function(snap2) {
+          const r2 = snap2.val();
+          if (r2 && r2.vehicles) {
+            const incoming = migrateInvoices(migrateCustomers(migratePhotos(r2)));
+            if (JSON.stringify(incoming) !== JSON.stringify(data)) {
+              data = incoming;
+              if (!data.partsInventory) data.partsInventory = [];
+              if (data.partsInventory.length > 0 && !data.partsInventory[0].partNumbers) {
+                data.partsInventory = data.partsInventory.map(function(p) {
+                  return {id: p.id, name: p.name||'', qty: p.qty||'', minQty: p.minQty||'', location: p.location||'', notes: p.notes||'', partNumbers: (p.num||p.vendor)?[{id:p.id+'_pn',num:p.num||'',vendor:p.vendor||'',unitCost:p.unitCost||'',notes:''}]:[]};
+                });
+              }
+              saveData(data);
+              render();
+            }
+            const dot=document.getElementById('sync-dot');
+            const lbl=document.getElementById('sync-lbl');
+            if(dot){dot.style.color='#16a34a';}if(lbl)lbl.textContent='Synced';
+          }
+        });
+      });
+    } catch(e) {
+      console.warn('Firebase unavailable:', e.message);
+    }
+
+    // ── Initial render ──────────────────────────────────────────────────────
+    render();
+    setTimeout(requestNotifPermission, 2000);
+
+  </script>
+</body>
+</html>
