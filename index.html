@@ -1386,6 +1386,7 @@
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             ${activeInvFilters?`<button class="btn btn-ghost btn-sm" data-action="inv-clear-filters">✕ Clear</button>`:''}
+${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").trim().toLowerCase()))].filter(n=>n&&(data.partsInventory||[]).filter(p=>(p.name||"").trim().toLowerCase()===n).length>1); return names.length?`<button class="btn btn-ghost btn-sm" style="border-color:#d97706;color:#d97706" data-action="inv-find-dupes">⚠ ${names.length} Duplicate${names.length>1?"s":""}</button>`:""; })()}
             <button class="btn btn-primary btn-sm" data-action="add-inv-item">+ Add Item</button>
           </div>
         </div>
@@ -1481,6 +1482,60 @@
             }).join('')}`;
     }
 
+
+
+    function invDupesModalHTML() {
+      const inv = data.partsInventory || [];
+      const groups = {};
+      inv.forEach(p => {
+        const key = (p.name||'').trim().toLowerCase();
+        if (!key) return;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(p);
+      });
+      const dupGroups = Object.entries(groups).filter(([k,g])=>g.length>1);
+
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal" style="max-width:700px">
+          <div class="modal-hdr">
+            <div class="modal-title">Duplicate Items</div>
+            <button class="modal-close" data-action="close-modal">✕</button>
+          </div>
+          <div class="modal-body">
+            ${dupGroups.length===0
+              ? '<div class="empty"><div class="empty-icon">✓</div><div class="empty-title">No Duplicates Found</div></div>'
+              : dupGroups.map(([key,parts]) => `
+                <div style="margin-bottom:16px;padding:14px;background:var(--bg3);border-radius:6px;border-left:3px solid #d97706">
+                  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+                    <div>
+                      <span style="font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700">${esc(parts[0].name)}</span>
+                      <span style="font-size:12px;color:var(--text-dim);margin-left:8px">${parts.length} entries</span>
+                    </div>
+                    <button class="btn btn-primary btn-sm" data-action="inv-merge-dupes" data-key="${esc(key)}">Merge All</button>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;font-size:13px">
+                    <thead><tr style="border-bottom:1px solid var(--border)">
+                      <th style="padding:4px 8px;text-align:left;color:var(--text-dim)">Part Numbers</th>
+                      <th style="padding:4px 8px;text-align:center;color:var(--text-dim)">Qty</th>
+                      <th style="padding:4px 8px;text-align:left;color:var(--text-dim)">Location</th>
+                      <th></th>
+                    </tr></thead>
+                    <tbody>${parts.map((p,i)=>`<tr style="border-bottom:1px solid var(--bg3)">
+                      <td style="padding:6px 8px">${(p.partNumbers||[]).map(n=>esc(n.vendor?n.vendor+' #'+n.num:n.num)).join(', ')||'—'}</td>
+                      <td style="padding:6px 8px;text-align:center;font-family:'Share Tech Mono',monospace">${p.qty||'—'}</td>
+                      <td style="padding:6px 8px;color:var(--text-dim)">${esc(p.location||'')}</td>
+                      <td style="padding:6px 8px">${i>0?`<button class="btn btn-ghost btn-sm" style="font-size:11px" data-action="inv-merge-into" data-src="${esc(p.id)}" data-dest="${esc(parts[0].id)}">Merge↑</button>`:'<span style="font-size:11px;color:var(--text-dim)">Primary</span>'}</td>
+                    </tr>`).join('')}</tbody>
+                  </table>
+                </div>`).join('')}
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Close</button>
+            ${dupGroups.length>0?`<button class="btn btn-primary" data-action="inv-merge-all-dupes">Merge All Duplicates</button>`:''}
+          </div>
+        </div>
+      </div>`;
+    }
 
     function invItemModalHTML(item) {
       const allLocs = [...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))].sort();
@@ -2288,7 +2343,7 @@
       else if (modalState.type==='inv-item')       modal = invItemModalHTML(modalState.target);
       else if (modalState.type==='part-num')       modal = partNumModalHTML(modalState.itemId, modalState.target);
       else if (modalState.type==='todo-edit')      modal = todoModalHTML(modalState.vehicle, modalState.todo);
-      else if (modalState.type==='inv-dupes')      modal = `<div class="modal-overlay" id="modal-bg"><div class="modal"><div class="modal-hdr"><div class="modal-title">Duplicates</div><button class="modal-close" data-action="close-modal">✕</button></div><div class="modal-body"><p>Duplicate detection is now handled within each item's part numbers.</p></div><div class="modal-footer"><button class="btn btn-primary" data-action="close-modal">OK</button></div></div></div>`;
+      else if (modalState.type==='inv-dupes')      modal = invDupesModalHTML();
       else if (modalState.type==='pin-set')        modal = renderPinScreen('set');
       return modal;
     }
@@ -2689,7 +2744,57 @@
         const nid=el.dataset.nid;
         const inv=(data.partsInventory||[]).map(p=>p.id===id?{...p,partNumbers:(p.partNumbers||[]).filter(n=>n.id!==nid)}:p);
         update({...data,partsInventory:inv});
-      } else if(action==='inv-find-dupes'){alert('Duplicate detection is now handled within each item\'s part numbers.');
+      } else if(action==='inv-merge-into'){
+        const srcId=el.dataset.src,destId=el.dataset.dest;
+        if(!confirm('Merge into primary? Qty combined, part numbers merged.'))return;
+        const src=(data.partsInventory||[]).find(p=>p.id===srcId);
+        const dest=(data.partsInventory||[]).find(p=>p.id===destId);
+        if(!src||!dest)return;
+        const merged={...dest,
+          qty:String((parseInt(dest.qty)||0)+(parseInt(src.qty)||0)),
+          partNumbers:[...(dest.partNumbers||[]),...(src.partNumbers||[])],
+          notes:[dest.notes,src.notes].filter(Boolean).join('; '),
+          location:dest.location||src.location,
+          vehicleIds:[...new Set([...(dest.vehicleIds||[]),...(src.vehicleIds||[])])]
+        };
+        const inv=(data.partsInventory||[]).filter(p=>p.id!==srcId).map(p=>p.id===destId?merged:p);
+        modalState={type:'inv-dupes'};
+        update({...data,partsInventory:inv});
+      } else if(action==='inv-merge-dupes'){
+        const key=el.dataset.key;
+        const group=(data.partsInventory||[]).filter(p=>(p.name||'').trim().toLowerCase()===key);
+        if(group.length<2)return;
+        if(!confirm('Merge all '+group.length+' entries for "'+group[0].name+'"?'))return;
+        const dest=group[0];
+        const merged={...dest,
+          qty:String(group.reduce((s,p)=>s+(parseInt(p.qty)||0),0)),
+          partNumbers:group.flatMap(p=>p.partNumbers||[]),
+          notes:group.map(p=>p.notes).filter(Boolean).join('; '),
+          location:group.map(p=>p.location).find(Boolean)||'',
+          vehicleIds:[...new Set(group.flatMap(p=>p.vehicleIds||[]))]
+        };
+        const ids=new Set(group.map(p=>p.id));
+        const inv=(data.partsInventory||[]).filter(p=>!ids.has(p.id)||p.id===dest.id).map(p=>p.id===dest.id?merged:p);
+        modalState={type:'inv-dupes'};
+        update({...data,partsInventory:inv});
+      } else if(action==='inv-merge-all-dupes'){
+        const inv=data.partsInventory||[];
+        const groups={};
+        inv.forEach(p=>{const k=(p.name||'').trim().toLowerCase();if(!k)return;if(!groups[k])groups[k]=[];groups[k].push(p);});
+        const dupGroups=Object.values(groups).filter(g=>g.length>1);
+        if(!dupGroups.length){alert('No duplicates.');return;}
+        if(!confirm('Merge all duplicates?'))return;
+        let newInv=[...inv];
+        dupGroups.forEach(group=>{
+          const dest=group[0];
+          const merged={...dest,qty:String(group.reduce((s,p)=>s+(parseInt(p.qty)||0),0)),partNumbers:group.flatMap(p=>p.partNumbers||[]),notes:group.map(p=>p.notes).filter(Boolean).join('; '),location:group.map(p=>p.location).find(Boolean)||'',vehicleIds:[...new Set(group.flatMap(p=>p.vehicleIds||[]))]};
+          const ids=new Set(group.map(p=>p.id));
+          newInv=newInv.filter(p=>!ids.has(p.id)||p.id===dest.id).map(p=>p.id===dest.id?merged:p);
+        });
+        modalState=null;
+        update({...data,partsInventory:newInv});
+      } else if(action==='inv-find-dupes'){
+        modalState={type:'inv-dupes'};render();
       } else if(action==='inv-clear-filters'){window._invFilters={q:'',vendor:'',location:'',vehicle:''};render();
 
       } else if(action==='toggle-todo-section'){
