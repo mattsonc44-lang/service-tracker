@@ -206,6 +206,7 @@
     .po-table { width:100%; border-collapse:collapse; font-size:15px; }
     .po-table th { font-size:11px !important; font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border); background:#f8f9fa; position:sticky; top:0; }
     .po-table td { padding:11px 13px; border-bottom:1px solid var(--border); vertical-align:middle; }
+    .po-table tr:hover td { filter: brightness(0.97); }
     .po-row-needed  { background:#fff5f5; border-left:3px solid #dc2626; }
     .po-row-ordered { background:#fffbeb; border-left:3px solid #d97706; }
     .po-row-received{ background:#f0fdf4; border-left:3px solid #16a34a; }
@@ -2076,7 +2077,7 @@
               ${filtered.map(p=>{
                 const v=(data.vehicles||[]).find(v=>v.id===p.vehicleId);
                 const dotClass=p.received?'received':p.ordered?'ordered':'needed';
-                return `<tr>
+                return `<tr style="background:${p.received?'rgba(22,163,74,.06)':p.ordered?'rgba(217,119,6,.06)':'rgba(220,38,38,.04)'}">
                   <td><span class="po-status-dot ${dotClass}"></span></td>
                   <td><input type="checkbox" class="po-cb" data-action="po-toggle-sel" data-id="${esc(p.id)}" ${selectedOrderPartIds.has(p.id)?'checked':''} style="accent-color:var(--amber);cursor:pointer;width:15px;height:15px" /></td>
                   <td style="font-weight:600">${esc(p.desc||'')}</td>
