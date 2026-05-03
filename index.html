@@ -15,7 +15,7 @@
       --text-bright: #111827;
     }
     body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; font-size: 15px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-    #app { display: flex; flex-direction: column; height: 100vh; max-width: 1200px; margin: 0 auto; width: 100%; }
+    #app { display: flex; flex-direction: column; height: 100vh; max-width: 1600px; margin: 0 auto; width: 100%; }
     .topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); flex-shrink:0; gap:12px; background:#ffffff; }
     .topbar-brand { display:flex; align-items:baseline; gap:10px; }
     .topbar-eyebrow { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--amber); text-transform:uppercase; }
@@ -76,7 +76,7 @@
     .vic-vname { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:var(--text-bright); line-height:1; margin-bottom:3px; }
     .vic-badge { display:inline-block; font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--amber-dim); background:rgba(217,119,6,.1); padding:2px 8px; border-radius:3px; }
     .vic-actions { display:flex; gap:8px; flex-shrink:0; }
-    .vic-specs { display:grid; grid-template-columns:repeat(auto-fill, minmax(110px,1fr)); }
+    .vic-specs { display:grid; grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); }
     .vic-spec { padding:12px 18px; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
     .vic-spec:last-child { border-right:none; }
     .vic-spec-lbl { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px; }
@@ -343,7 +343,8 @@
     .report-table .td-part { font-family:'Share Tech Mono',monospace; font-size:15px; color:var(--amber); }
     .report-table .td-cost { font-family:'Share Tech Mono',monospace; font-size:15px; color:var(--green); text-align:right; }
     .report-table .td-notes { font-size:15px; color:var(--text-dim); max-width:320px; }
-    .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:0; flex-shrink:0; background:#ffffff; }
+    .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:0; flex-shrink:0; background:#ffffff; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; }
+    .tab-bar::-webkit-scrollbar { display:none; }
     .tab-btn { padding:10px 20px; font-family:'Rajdhani',sans-serif; font-size:15px; font-weight:600; color:var(--text-dim); cursor:pointer; border:none; background:none; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s, border-color .15s; }
     .tab-btn:hover { color:var(--text); }
     .tab-btn.active { color:var(--amber); border-bottom-color:var(--amber); }
@@ -795,7 +796,7 @@
         v.hours&&`<div class="vic-spec"><div class="vic-spec-lbl">Hrs / Miles</div><div class="vic-spec-val">${Number(v.hours).toLocaleString()}</div></div>`,
         v.engine&&`<div class="vic-spec"><div class="vic-spec-lbl">Engine</div><div class="vic-spec-val">${esc(v.engine)}</div></div>`,
         v.hp&&`<div class="vic-spec"><div class="vic-spec-lbl">Horsepower</div><div class="vic-spec-val">${esc(String(v.hp))} hp</div></div>`,
-        v.vin&&`<div class="vic-spec"><div class="vic-spec-lbl">VIN / Serial</div><div class="vic-spec-val" style="font-size:12px">${esc(v.vin)}</div></div>`,
+        v.vin&&`<div class="vic-spec" style="grid-column:span 2"><div class="vic-spec-lbl">VIN / Serial</div><div class="vic-spec-val" style="font-size:12px;word-break:break-all">${esc(v.vin)}</div></div>`,
         `<div class="vic-spec"><div class="vic-spec-lbl">Records</div><div class="vic-spec-val">${recs.length}</div></div>`,
         `<div class="vic-spec"><div class="vic-spec-lbl">Total Cost</div><div class="vic-spec-val" style="color:var(--green)">$${sumCost(recs).toLocaleString()}</div></div>`,
         recs[0]&&`<div class="vic-spec"><div class="vic-spec-lbl">Last Service</div><div class="vic-spec-val" style="font-size:13px">${esc(recs[0].date)}</div></div>`,
@@ -1883,6 +1884,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
     // ── Record Modal ────────────────────────────────────────────────────────
     function recordModalHTML(r) {
       const existingPartsJson = r ? JSON.stringify(getPartsArray(r)) : '[]';
+      const pf = (!r && modalState?.prefill) ? modalState.prefill : null;
       return `<div class="modal-overlay" id="modal-bg">
         <div class="modal" style="max-width:680px">
           <div class="modal-hdr"><div class="modal-title">${r?'Edit Service Record':'Log Service'}</div><button class="modal-close" data-action="close-modal">✕</button></div>
@@ -2610,7 +2612,9 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
         }
         modalState=null;render();
 
-      } else if(action==='add-record'){modalState={type:'record',target:null};render();
+      } else if(action==='add-record'){
+        if(!selectedId){alert('Please select a vehicle first.');return;}
+        modalState={type:'record',target:null,prefill:null};render();
       } else if(action==='edit-record'){
         const r=data.records.find(r=>r.id===id)||null;
         if(r)modalState={type:'record',target:r,editOldParts:getPartsArray(r)};render();
@@ -2969,11 +2973,10 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
         window['_todoOpen_'+id]=(window['_todoOpen_'+id]===false)?true:false;render();
       } else if(action==='todo-convert-service'){
         const vid=el.dataset.vid, tid=el.dataset.tid;
-        const v=data.vehicles.find(v=>v.id===vid);
+        const v=(data.vehicles||[]).find(v=>v.id===vid);
         const todo=(v?.todos||[]).find(t=>t.id===tid);
-        if(!v||!todo)return;
-        // Pre-fill the record modal with the todo text, navigate to vehicle
-        selectedId=vid; selectedCustomerId=v.customerId; appView='fleet';
+        if(!v||!todo){alert('Could not find vehicle or task.');return;}
+        selectedId=vid; selectedCustomerId=v.customerId||''; appView='fleet';
         modalState={type:'record',target:null,prefill:{notes:todo.text,type:''}};
         render();
       } else if(action==='todo-add'){
