@@ -1749,6 +1749,41 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
     }
 
     // ── Vehicle Modal ───────────────────────────────────────────────────────
+
+    function editOrderPartModalHTML(p) {
+      const vehicles=(data.vehicles||[]).sort((a,b)=>a.name.localeCompare(b.name));
+      return `<div class="modal-overlay" id="modal-bg">
+        <div class="modal">
+          <div class="modal-hdr"><div class="modal-title">Edit Order Part</div><button class="modal-close" data-action="close-modal">✕</button></div>
+          <div class="modal-body">
+            <div class="form-row">
+              <div class="form-group form-full"><label class="form-lbl">Description</label><input id="f-epo-desc" class="form-input" value="${esc(p.desc||'')}" /></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Part #</label><input id="f-epo-num" class="form-input" value="${esc(p.num||'')}" /></div>
+              <div class="form-group"><label class="form-lbl">Vendor</label><input id="f-epo-vendor" class="form-input" list="epo-vendor-list" value="${esc(p.vendor||'')}" autocomplete="off" />
+                <datalist id="epo-vendor-list">${(data.vendors||[]).sort((a,b)=>a.name.localeCompare(b.name)).map(v=>`<option value="${esc(v.name)}"></option>`).join('')}</datalist>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-lbl">Qty</label><input id="f-epo-qty" class="form-input" type="number" value="${esc(p.qty||'1')}" min="1" /></div>
+              <div class="form-group"><label class="form-lbl">Unit Cost</label><input id="f-epo-cost" class="form-input" type="number" value="${esc(p.unitCost||'')}" step="0.01" min="0" /></div>
+            </div>
+            <div class="form-group"><label class="form-lbl">Vehicle</label>
+              <select id="f-epo-vehicle" class="form-select">
+                <option value="__stock__" ${(!p.vehicleId||p.vehicleId==='__stock__')?'selected':''}>📦 For Stock</option>
+                ${vehicles.map(v=>`<option value="${esc(v.id)}" ${p.vehicleId===v.id?'selected':''}>${esc(v.name)}${v.year?' ('+v.year+')':''}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
+            <button class="btn btn-primary" data-action="save-edit-order-part">Save</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
     function vehicleModalHTML(v) {
       const customers = data.customers||[];
       const locs = [...new Set((data.partsInventory||[]).map(p=>p.location).filter(Boolean))];
@@ -2158,7 +2193,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
                   <td>${esc(p.vendor||'')}</td>
                   <td>${esc(p.qty||'1')}</td>
                   <td>${p.unitCost?'$'+Number(p.unitCost).toFixed(2):''}</td>
-                  <td style="font-size:12px">${esc(v?.name||p.vehicleId==='__stock__'?'For Stock':'')}</td>
+                  <td style="font-size:12px">${p.vehicleId==='__stock__'?'📦 For Stock':esc(v?.name||'')}</td>
                   <td>
                     <div style="display:flex;gap:4px;align-items:center">
                       <input type="checkbox" class="po-cb" data-action="toggle-part-ordered" data-id="${esc(p.id)}" ${p.ordered||p.received?'checked':''} ${p.received?'disabled':''} />
@@ -2340,6 +2375,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
       else if (modalState.type==='vendor')         modal = vendorModalHTML(modalState.target);
       else if (modalState.type==='receive-part')   modal = receivePartModalHTML(modalState.target);
       else if (modalState.type==='add-parts-to-svc') modal = addPartsToServiceModalHTML(modalState.parts);
+      else if (modalState.type==='edit-order-part') modal = editOrderPartModalHTML(modalState.target);
       else if (modalState.type==='inv-item')       modal = invItemModalHTML(modalState.target);
       else if (modalState.type==='part-num')       modal = partNumModalHTML(modalState.itemId, modalState.target);
       else if (modalState.type==='todo-edit')      modal = todoModalHTML(modalState.vehicle, modalState.todo);
@@ -2640,15 +2676,22 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
           update({...data,partsToOrder:[...(data.partsToOrder||[]),newP]});
         });
       } else if(action==='edit-part-order'){
-        const p=(data.partsToOrder||[]).find(p=>p.id===id)||null;
-        if(p){
-          const desc=prompt('Description:',p.desc)||p.desc;
-          const num=prompt('Part #:',p.num||'')||p.num||'';
-          const vendor=prompt('Vendor:',p.vendor||'')||p.vendor||'';
-          const qty=prompt('Qty:',p.qty||'1')||p.qty||'1';
-          const cost=prompt('Unit Cost:',p.unitCost||'')||p.unitCost||'';
-          update({...data,partsToOrder:(data.partsToOrder||[]).map(pp=>pp.id===id?{...pp,desc,num,vendor,qty,unitCost:cost}:pp)});
-        }
+        const p=(data.partsToOrder||[]).find(pp=>pp.id===id)||null;
+        if(!p)return;
+        modalState={type:'edit-order-part',target:p};render();
+      } else if(action==='save-edit-order-part'){
+        const p=modalState.target;
+        const updated={
+          ...p,
+          desc:document.getElementById('f-epo-desc')?.value?.trim()||p.desc,
+          num:document.getElementById('f-epo-num')?.value?.trim()||'',
+          vendor:document.getElementById('f-epo-vendor')?.value?.trim()||'',
+          qty:document.getElementById('f-epo-qty')?.value?.trim()||'1',
+          unitCost:document.getElementById('f-epo-cost')?.value?.trim()||'',
+          vehicleId:document.getElementById('f-epo-vehicle')?.value||'__stock__',
+        };
+        modalState=null;
+        update({...data,partsToOrder:(data.partsToOrder||[]).map(pp=>pp.id===p.id?updated:pp)});
       } else if(action==='del-part-order'){
         if(!confirm('Remove this order item?'))return;
         update({...data,partsToOrder:(data.partsToOrder||[]).filter(p=>p.id!==id)});
