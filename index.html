@@ -890,6 +890,7 @@
                     ${t.notes?`<div class='todo-meta'>${esc(t.notes)}</div>`:''}
                   </div>
                   <span class='todo-priority ${t.priority||'medium'}'>${(t.priority||'medium').toUpperCase()}</span>
+                  <button class='btn btn-ghost btn-sm no-print' style='padding:2px 7px;font-size:12px;color:#2563eb;border-color:rgba(37,99,235,.3)' data-action='todo-convert-service' data-vid='${esc(v.id)}' data-tid='${esc(t.id)}'>→ Service</button>
                   <button class='btn btn-ghost btn-sm no-print' style='padding:2px 7px;font-size:12px' data-action='todo-edit' data-vid='${esc(v.id)}' data-tid='${esc(t.id)}'>Edit</button>
                   <button class='part-remove-btn no-print' style='padding:4px 8px' data-action='todo-del' data-vid='${esc(v.id)}' data-tid='${esc(t.id)}'>✕</button>
                 </div>`).join('')}
@@ -905,6 +906,12 @@
             </div>`:''}
           </div>`;
         })()}
+        <div class="vic-body" style="padding:0 0 0 0">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px" class="no-print">
+            <div style="font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;color:var(--text-bright)">Service History <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text-dim);font-weight:400">${recs.length} record${recs.length!==1?'s':''}</span></div>
+            <button class="btn btn-primary btn-sm" data-action="add-record">+ Log Service</button>
+          </div>
+        </div>
         ${rows}`;
     }
 
@@ -1882,7 +1889,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
           <div class="modal-body">
             <div class="form-row">
               <div class="form-group"><label class="form-lbl">Date *</label><input id="f-date" class="form-input" type="date" value="${esc(r?.date||new Date().toISOString().slice(0,10))}" /></div>
-              <div class="form-group"><label class="form-lbl">Service Type *</label><input id="f-type" class="form-input" list="svc-type-opts" value="${esc(r?.type||'')}" placeholder="Type or select..." autocomplete="off" /><datalist id="svc-type-opts">${SERVICE_TYPES.map(t=>`<option value="${t}"></option>`).join('')}</datalist></div>
+              <div class="form-group"><label class="form-lbl">Service Type *</label><input id="f-type" class="form-input" list="svc-type-opts" value="${esc(r?.type||pf?.type||'')}" placeholder="Type or select..." autocomplete="off" /><datalist id="svc-type-opts">${SERVICE_TYPES.map(t=>`<option value="${t}"></option>`).join('')}</datalist></div>
             </div>
             <div class="form-row">
               <div class="form-group"><label class="form-lbl">Cost ($)</label><input id="f-cost" class="form-input" type="number" value="${esc(r?.cost||'0.00')}" placeholder="0.00" step="0.01" min="0" /></div>
@@ -1903,7 +1910,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
               </div>
               <button class="btn btn-ghost btn-sm" data-action="add-part" style="margin-top:8px">+ Add Another Part</button>
             </div>
-            <div class="form-group"><label class="form-lbl">Notes / Parts Used</label><textarea id="f-notes" class="form-textarea" placeholder="Work done, parts replaced...">${esc(getCleanNotes(r||{}))}</textarea></div>
+            <div class="form-group"><label class="form-lbl">Notes / Parts Used</label><textarea id="f-notes" class="form-textarea" placeholder="Work done, parts replaced...">${esc(r?getCleanNotes(r):pf?.notes||'')}</textarea></div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-ghost" data-action="close-modal">Cancel</button>
@@ -2067,6 +2074,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
             <span style="font-size:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;padding:2px 8px;border-radius:10px;background:${priBg[t.priority||'medium']};color:${priColor[t.priority||'medium']}">${(t.priority||'MEDIUM').toUpperCase()}</span>
+            <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px;color:#2563eb;border-color:rgba(37,99,235,.3)" data-action="todo-convert-service" data-vid="${esc(v.id)}" data-tid="${esc(t.id)}">→ Log Service</button>
             <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px" data-action="todo-edit" data-vid="${esc(v.id)}" data-tid="${esc(t.id)}">Edit</button>
           </div>
         </div>`;
@@ -2959,6 +2967,15 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
 
       } else if(action==='toggle-todo-section'){
         window['_todoOpen_'+id]=(window['_todoOpen_'+id]===false)?true:false;render();
+      } else if(action==='todo-convert-service'){
+        const vid=el.dataset.vid, tid=el.dataset.tid;
+        const v=data.vehicles.find(v=>v.id===vid);
+        const todo=(v?.todos||[]).find(t=>t.id===tid);
+        if(!v||!todo)return;
+        // Pre-fill the record modal with the todo text, navigate to vehicle
+        selectedId=vid; selectedCustomerId=v.customerId; appView='fleet';
+        modalState={type:'record',target:null,prefill:{notes:todo.text,type:''}};
+        render();
       } else if(action==='todo-add'){
         const vid=el.dataset.vid;
         const textEl=document.getElementById('todo-new-'+vid);
