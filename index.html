@@ -25,8 +25,8 @@
     .ts-item { text-align:center; }
     .ts-val { font-family:'Rajdhani',sans-serif; font-size:18px; font-weight:700; color:var(--amber); line-height:1; }
     .ts-lbl { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:1.5px; color:var(--text-dim); text-transform:uppercase; }
-    .layout { display:flex; flex:1; overflow:hidden; }
-    .sidebar { width:240px; flex-shrink:0; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; background:#f8f9fa; }
+    .layout { display:flex; flex:1; overflow:hidden; min-height:0; }
+    .sidebar { width:240px; flex-shrink:0; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; background:#f8f9fa; min-height:0; }
     .sidebar-hdr { padding:12px 14px 10px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
     .sidebar-lbl { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:2px; color:var(--text-dim); text-transform:uppercase; }
     .sidebar-list { overflow-y:auto; flex:1; padding:6px 0; }
@@ -857,6 +857,7 @@
               <div><div class="vic-vname">${esc(v.name)}</div><span class="vic-badge">${esc(v.type)}</span></div>
             </div>
             <div class="vic-actions">
+              <button class="btn btn-ghost btn-sm no-print" data-action="print-service-history" data-id="${esc(v.id)}">🖨 Print History</button>
               <button class="btn btn-ghost btn-sm" data-action="edit-vehicle" data-id="${esc(v.id)}">Edit</button>
               <button class="btn btn-danger btn-sm" data-action="del-vehicle" data-id="${esc(v.id)}">Delete</button>
             </div>
@@ -864,6 +865,46 @@
           <div class="vic-specs">${specs}</div>
           ${v.notes?`<div class="vic-notes">📝 ${esc(v.notes)}</div>`:''}
         </div>
+        ${(()=>{
+          const todos=v.todos||[];
+          const open=todos.filter(t=>!t.done).length;
+          const done=todos.filter(t=>t.done).length;
+          const isOpen=window['_todoOpen_'+v.id]!==false;
+          return `<div class='todo-section'>
+            <div class='todo-hdr no-print' data-action='toggle-todo-section' data-id='${esc(v.id)}'>
+              <div class='todo-hdr-title'>
+                ✅ To-Do List
+                ${open>0?`<span class='todo-badge'>${open} open</span>`:''}
+                ${done>0?`<span class='todo-badge done'>${done} done</span>`:''}
+              </div>
+              <span style='font-size:12px;color:var(--text-dim)'>${isOpen?'▲':'▼'}</span>
+            </div>
+            ${isOpen?`
+            <div class='todo-list'>
+              ${todos.length===0?'<div style="font-size:13px;color:var(--text-dim);padding:4px 0">No tasks yet — add one below.</div>':''}
+              ${todos.map(t=>`
+                <div class='todo-item${t.done?' done':''}'>
+                  <input type='checkbox' class='todo-cb no-print' data-action='todo-toggle' data-vid='${esc(v.id)}' data-tid='${esc(t.id)}' ${t.done?'checked':''} />
+                  <div style='flex:1;min-width:0'>
+                    <div class='todo-text'>${esc(t.text)}</div>
+                    ${t.notes?`<div class='todo-meta'>${esc(t.notes)}</div>`:''}
+                  </div>
+                  <span class='todo-priority ${t.priority||'medium'}'>${(t.priority||'medium').toUpperCase()}</span>
+                  <button class='btn btn-ghost btn-sm no-print' style='padding:2px 7px;font-size:12px' data-action='todo-edit' data-vid='${esc(v.id)}' data-tid='${esc(t.id)}'>Edit</button>
+                  <button class='part-remove-btn no-print' style='padding:4px 8px' data-action='todo-del' data-vid='${esc(v.id)}' data-tid='${esc(t.id)}'>✕</button>
+                </div>`).join('')}
+              <div class='todo-add-row no-print'>
+                <input id='todo-new-${esc(v.id)}' class='form-input' placeholder='Add a task...' style='flex:1' autocomplete='off' />
+                <select id='todo-pri-${esc(v.id)}' class='form-select' style='width:110px'>
+                  <option value='high'>🔴 High</option>
+                  <option value='medium' selected>🟡 Medium</option>
+                  <option value='low'>🟢 Low</option>
+                </select>
+                <button class='btn btn-primary btn-sm' data-action='todo-add' data-vid='${esc(v.id)}' style='white-space:nowrap'>+ Add</button>
+              </div>
+            </div>`:''}
+          </div>`;
+        })()}
         ${rows}`;
     }
 
@@ -2439,8 +2480,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
       } else if(action==='back-to-customers'){
         selectedCustomerId='';selectedId='';sidebarSearch='';appView='fleet';render();
       } else if(action==='sidebar-search'){
-        sidebarSearch=el.value;render();
-        const si=document.getElementById('sidebar-search-input');if(si){si.focus();si.setSelectionRange&&si.setSelectionRange(si.value.length,si.value.length);}
+        // handled by input event
       } else if(action==='select-vehicle'){
         const v=data.vehicles.find(v=>v.id===id);
         if(v){selectedId=v.id;selectedCustomerId=v.customerId;appView='fleet';render();}
@@ -2993,7 +3033,14 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
 
     // ── Input events ────────────────────────────────────────────────────────
     document.getElementById('app').addEventListener('input', function(e) {
-      if(e.target.id==='sidebar-search-input'){sidebarSearch=e.target.value;render();const si=document.getElementById('sidebar-search-input');if(si){si.focus();}return;}
+      if(e.target.id==='sidebar-search-input'){
+        sidebarSearch=e.target.value;
+        const pos=e.target.selectionStart;
+        render();
+        const si=document.getElementById('sidebar-search-input');
+        if(si){si.focus();si.setSelectionRange&&si.setSelectionRange(pos,pos);}
+        return;
+      }
       if(e.target.id==='gs-input'){window._gsq=e.target.value;render();const el=document.getElementById('gs-input');if(el){el.focus();el.setSelectionRange&&el.setSelectionRange(el.value.length,el.value.length);}return;}
       if(e.target.id==='po-q'){
         poFilters['q']=e.target.value;
