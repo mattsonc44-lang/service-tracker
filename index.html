@@ -2029,6 +2029,77 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
     }
 
     // ── Render: Vendors Tab ─────────────────────────────────────────────────
+
+    function renderAllTodos() {
+      const vehicles = data.vehicles || [];
+      const customers = data.customers || [];
+
+      // Build flat list of all todos with vehicle context
+      const allItems = [];
+      vehicles.forEach(v => {
+        (v.todos||[]).forEach(t => {
+          allItems.push({todo:t, vehicle:v, cust:customers.find(c=>c.id===v.customerId)});
+        });
+      });
+
+      const open   = allItems.filter(i=>!i.todo.done);
+      const done   = allItems.filter(i=>i.todo.done);
+
+      // Sort open: high first, then medium, then low; within priority by vehicle name
+      const priOrder = {high:0,medium:1,low:2};
+      open.sort((a,b)=>(priOrder[a.todo.priority||'medium']||1)-(priOrder[b.todo.priority||'medium']||1)||a.vehicle.name.localeCompare(b.vehicle.name));
+
+      const priColor = {high:'#dc2626',medium:'#d97706',low:'#16a34a'};
+      const priBg    = {high:'rgba(220,38,38,.08)',medium:'rgba(217,119,6,.08)',low:'rgba(22,163,74,.08)'};
+
+      function todoCard(item, showDone) {
+        const t=item.todo, v=item.vehicle, c=item.cust;
+        return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 16px;background:var(--panel);border:1px solid var(--border);border-left:3px solid ${priColor[t.priority||'medium']};border-radius:6px;margin-bottom:8px;${showDone?'opacity:.6':''}">
+          <input type="checkbox" class="todo-cb no-print" data-action="todo-toggle" data-vid="${esc(v.id)}" data-tid="${esc(t.id)}" ${t.done?'checked':''} style="margin-top:3px" />
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600;color:var(--text-bright);${showDone?'text-decoration:line-through;color:var(--text-dim)':''}">${esc(t.text)}</div>
+            ${t.notes?`<div style="font-size:13px;color:var(--text-dim);margin-top:2px">${esc(t.notes)}</div>`:''}
+            <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap">
+              <span style="font-size:12px;font-weight:600;color:var(--amber-dim);cursor:pointer" data-action="nav-to-vehicle" data-id="${esc(v.id)}" data-cust="${esc(v.customerId)}">${esc(v.name)}</span>
+              ${c?`<span style="font-size:11px;color:var(--text-dim)">${esc(c.name)}</span>`:''}
+              ${t.createdAt?`<span style="font-size:11px;color:var(--text-dim)">${t.createdAt}</span>`:''}
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+            <span style="font-size:10px;font-family:'Share Tech Mono',monospace;letter-spacing:1px;padding:2px 8px;border-radius:10px;background:${priBg[t.priority||'medium']};color:${priColor[t.priority||'medium']}">${(t.priority||'MEDIUM').toUpperCase()}</span>
+            <button class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:11px" data-action="todo-edit" data-vid="${esc(v.id)}" data-tid="${esc(t.id)}">Edit</button>
+          </div>
+        </div>`;
+      }
+
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div class="overview-title">To-Do List</div>
+            <div class="overview-sub">${open.length} open task${open.length!==1?'s':''} · ${done.length} completed</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            ${open.filter(i=>i.todo.priority==='high').length?`<span style="padding:4px 12px;border-radius:12px;background:rgba(220,38,38,.1);color:#dc2626;font-size:13px;font-weight:600">🔴 ${open.filter(i=>i.todo.priority==='high').length} High</span>`:''}
+            ${open.filter(i=>(i.todo.priority||'medium')==='medium').length?`<span style="padding:4px 12px;border-radius:12px;background:rgba(217,119,6,.1);color:#d97706;font-size:13px;font-weight:600">🟡 ${open.filter(i=>(i.todo.priority||'medium')==='medium').length} Medium</span>`:''}
+            ${open.filter(i=>i.todo.priority==='low').length?`<span style="padding:4px 12px;border-radius:12px;background:rgba(22,163,74,.1);color:#16a34a;font-size:13px;font-weight:600">🟢 ${open.filter(i=>i.todo.priority==='low').length} Low</span>`:''}
+          </div>
+        </div>
+
+        ${open.length===0 && done.length===0
+          ? `<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">No Tasks Yet</div><div style="font-size:14px">Open a vehicle in the Fleet tab and add tasks to its To-Do list.</div></div>`
+          : ''}
+
+        ${open.length>0 ? `
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px">Open Tasks</div>
+          ${open.map(i=>todoCard(i,false)).join('')}
+        ` : ''}
+
+        ${done.length>0 ? `
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin:16px 0 10px">Completed</div>
+          ${done.map(i=>todoCard(i,true)).join('')}
+        ` : ''}`;
+    }
+
     function renderVendors() {
       const vendors = data.vendors||[];
       return `
@@ -2378,6 +2449,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
             ${getFeature('partsInventory')?`<button class="tab-btn${appView==='parts'?' active':''}" data-action="tab-parts">Parts</button>`:''}
             <button class="tab-btn${appView==='vendors'?' active':''}" data-action="tab-vendors">Vendors</button>
             <button class="tab-btn${appView==='orderhistory'?' active':''}" data-action="tab-orderhistory">Order History</button>
+            <button class="tab-btn${appView==='todos'?' active':''}" data-action="tab-todos">✅ To-Do${(()=>{const n=(data.vehicles||[]).reduce((s,v)=>s+(v.todos||[]).filter(t=>!t.done).length,0);return n?` (${n})`:''})()}</button>
             <button class="tab-btn${appView==='search'?' active':''}" data-action="tab-search">🔍 Search</button>
             <button class="tab-btn${appView==='admin'?' active':''}" data-action="tab-admin">⚙ Admin</button>
           </div>
@@ -2394,6 +2466,8 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
           ? `<div class="main"><div class="main-content">${renderPartsToOrder()}</div></div>`
           : appView==='parts'
           ? `<div class="main"><div class="main-content">${renderPartsInventory()}</div></div>`
+          : appView==='todos'
+          ? `<div class="main"><div class="main-content">${renderAllTodos()}</div></div>`
           : appView==='vendors'
           ? `<div class="main"><div class="main-content">${renderVendors()}</div></div>`
           : appView==='orderhistory'
@@ -2469,6 +2543,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
       } else if(action==='tab-invoices'){appView='invoices';render();
       } else if(action==='tab-order'){appView='order';render();
       } else if(action==='tab-parts'){appView='parts';render();
+      } else if(action==='tab-todos'){appView='todos';render();
       } else if(action==='tab-vendors'){appView='vendors';render();
       } else if(action==='tab-orderhistory'){appView='orderhistory';render();
       } else if(action==='tab-search'){appView='search';render();
@@ -2481,6 +2556,8 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
         selectedCustomerId='';selectedId='';sidebarSearch='';appView='fleet';render();
       } else if(action==='sidebar-search'){
         // handled by input event
+      } else if(action==='nav-to-vehicle'){
+        selectedId=id;selectedCustomerId=el.dataset.cust||'';appView='fleet';render();
       } else if(action==='select-vehicle'){
         const v=data.vehicles.find(v=>v.id===id);
         if(v){selectedId=v.id;selectedCustomerId=v.customerId;appView='fleet';render();}
