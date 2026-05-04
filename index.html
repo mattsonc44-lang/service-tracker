@@ -518,6 +518,33 @@
       else if (syncStatus==='offline') { dot.classList.add('offline'); if(lbl) lbl.textContent='Offline'; }
     }
     // Migrate old separate photo store into vehicle objects
+
+    function migratePartsInventoryToNewStructure(inv) {
+      return (inv||[]).map(function(p) {
+        if (p.partNumbers) return p; // already migrated
+        const partNums = [];
+        if (p.num || p.vendor || p.unitCost) {
+          partNums.push({
+            id: p.id+'_pn1',
+            num: p.num||'',
+            vendor: p.vendor||'',
+            unitCost: p.unitCost||'',
+            notes: ''
+          });
+        }
+        return {
+          id: p.id,
+          name: p.name||'',
+          qty: p.qty||'',
+          minQty: p.minQty||'',
+          location: p.location||'',
+          notes: p.notes||'',
+          vehicleIds: [],
+          partNumbers: partNums
+        };
+      });
+    }
+
     function migrateInvoices(d) {
       if (!d.invoices) d.invoices = [];
       if (!d.settings) d.settings = {businessName: ''};
@@ -526,19 +553,7 @@
       if (!d.partsToOrder) d.partsToOrder = [];
       if (!d.partsInventory) d.partsInventory = [];
       // Migrate old flat structure to new item+partNumbers model
-      if (d.partsInventory.length > 0 && !d.partsInventory[0].partNumbers) {
-        d.partsInventory = d.partsInventory.map(function(p) {
-          const partNums = [];
-          if (p.num || p.vendor || p.unitCost) {
-            partNums.push({id: p.id+'_pn1', num: p.num||'', vendor: p.vendor||'', unitCost: p.unitCost||'', notes: ''});
-          }
-          return {
-            id: p.id, name: p.name||'', qty: p.qty||'', minQty: p.minQty||'',
-            location: p.location||'', notes: p.notes||'',
-            partNumbers: partNums
-          };
-        });
-      }
+      d.partsInventory = migratePartsInventoryToNewStructure(d.partsInventory);
       if (!d.vendors) d.vendors = [];
       if (!d.orderHistory) d.orderHistory = [];
       return d;
@@ -669,7 +684,7 @@
       }
 
       // ── LEVEL 2: Equipment list for selected customer ───────────────────
-      const custVehicles = data.vehicles.filter(v=>v.customerId===selCust.id);
+      const custVehicles = data.vehicles.filter(v=>v.customerId===selCust.id).sort((a,b)=>a.name.localeCompare(b.name));
       const filtered = sidebarSearch
         ? custVehicles.filter(v=>(v.name+v.make+v.model+v.type).toLowerCase().includes(sidebarSearch.toLowerCase()))
         : custVehicles;
@@ -749,7 +764,7 @@
       }
 
       // Customer selected — show their fleet
-      const custVehicles = data.vehicles.filter(v=>v.customerId===selCust.id);
+      const custVehicles = data.vehicles.filter(v=>v.customerId===selCust.id).sort((a,b)=>a.name.localeCompare(b.name));
       const custRecords = data.records.filter(r=>custVehicles.some(v=>v.id===r.vehicleId));
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
@@ -2371,6 +2386,24 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
             </div>
           </div>
           <div class="admin-section">
+            <div class="admin-section-hdr"><div><div class="admin-section-title">Data Migration</div><div class="admin-section-desc">Convert Parts Inventory to the new item + part numbers structure.</div></div></div>
+            <div class="admin-section-body">
+              ${(()=>{
+                const inv=data.partsInventory||[];
+                const needsMigration=inv.length>0&&inv.some(p=>!p.partNumbers);
+                const already=inv.length>0&&inv.every(p=>p.partNumbers);
+                return needsMigration
+                  ? `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                      <div style="font-size:14px;color:#d97706">⚠ ${inv.filter(p=>!p.partNumbers).length} part(s) need migration to the new structure.</div>
+                      <button class="btn btn-primary btn-sm" data-action="run-parts-migration">Run Migration Now</button>
+                    </div>`
+                  : already
+                  ? `<div style="font-size:14px;color:#16a34a">✓ All ${inv.length} part(s) are on the new structure.</div>`
+                  : `<div style="font-size:14px;color:var(--text-dim)">No parts inventory to migrate.</div>`;
+              })()}
+            </div>
+          </div>
+          <div class="admin-section">
             <div class="admin-section-hdr"><div><div class="admin-section-title">Business Settings</div></div></div>
             <div class="admin-section-body">
               <div class="form-group"><label class="form-lbl">Business Name (appears on invoices)</label><input id="f-biz-name-admin" class="form-input" value="${esc(data.settings?.businessName||'')}" placeholder="e.g. Mattson Bros Farms" /></div>
@@ -3040,6 +3073,12 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
         </body></html>`);
         w.document.close();w.focus();setTimeout(function(){w.print();},400);
 
+      } else if(action==='run-parts-migration'){
+        const inv=data.partsInventory||[];
+        const migrated=migratePartsInventoryToNewStructure(inv);
+        const count=inv.filter(p=>!p.partNumbers).length;
+        update({...data,partsInventory:migrated});
+        alert('Migration complete! '+count+' item(s) converted.\n\nEach item now shows in Parts Inventory with its part number listed below it.');
       } else if(action==='save-settings-admin'){
         const bname=document.getElementById('f-biz-name-admin')?.value?.trim()||'';
         update({...data,settings:{...(data.settings||{}),businessName:bname}});
@@ -3251,15 +3290,7 @@ ${(()=>{ const names=[...new Set((data.partsInventory||[]).map(p=>(p.name||"").t
         if (remote && remote.vehicles && remote.vehicles.length > 0) {
           data = migrateInvoices(migrateCustomers(migratePhotos(remote)));
           if (!data.partsInventory) data.partsInventory = [];
-          if (data.partsInventory.length > 0 && !data.partsInventory[0].partNumbers) {
-            data.partsInventory = data.partsInventory.map(function(p) {
-              var partNums = [];
-              if (p.num || p.vendor || p.unitCost) {
-                partNums.push({id: p.id+'_pn1', num: p.num||'', vendor: p.vendor||'', unitCost: p.unitCost||'', notes: ''});
-              }
-              return {id: p.id, name: p.name||'', qty: p.qty||'', minQty: p.minQty||'', location: p.location||'', notes: p.notes||'', partNumbers: partNums};
-            });
-          }
+          data.partsInventory = migratePartsInventoryToNewStructure(data.partsInventory);
           saveData(data);
           render();
         }
